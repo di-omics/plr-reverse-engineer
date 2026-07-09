@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plr-re"
+version = "0.1.0"
+description = "Reverse-engineering toolkit to bring no-API lab instruments under PyLabRobot control"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "di-omics" }]
+dependencies = []
+
+# Core is stdlib-only so capture, decode, and dry-run replay work anywhere.
+# Hardware extras are optional and imported lazily.
+[project.optional-dependencies]
+serial = ["pyserial>=3.5"]
+pi = ["gpiozero>=2.0", "lgpio>=0.2"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+plr-re = "plr_re.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["plr_re*"]

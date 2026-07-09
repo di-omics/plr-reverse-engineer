@@ -1,0 +1,8 @@
+{
+  "ready": 17,
+  "start": 27,
+  "stop": 22,
+  "ready_active_low": false,
+  "out_active_low": true,
+  "pulse_s": 0.25
+}
