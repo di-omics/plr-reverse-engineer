@@ -1,8 +1,12 @@
-# plr-re
+# plr-reverse-engineer
 
 Reverse-engineering playbooks and tooling for bringing lab instruments that have no
 published automation API under PyLabRobot control, so a run can drive them headlessly
 (for example from a Raspberry Pi) instead of through the vendor console.
+
+> The installed CLI and Python package are `plr-re` / `plr_re` (short, for typing at the
+> bench). The repository is named `plr-reverse-engineer` so its purpose is obvious at a
+> glance; they are the same project.
 
 This repo is the reverse-engineering side. The PyLabRobot backends that actually talk to
 the hardware live in [di-omics/pylabrobot](https://github.com/di-omics/pylabrobot). The
