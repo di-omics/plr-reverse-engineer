@@ -27,6 +27,7 @@ instruments into PyLabRobot, credited and adapted per instrument.
 | Biotage V-10 Touch | Solvent evaporator | [instruments/biotage-v10-touch](instruments/biotage-v10-touch/README.md) | Transport branch resolved on the bench, then ProtocolMap recovery |
 
 [PREFLIGHT.md](PREFLIGHT.md) is the checkbox buy-and-pack checklist,
+[PI-SETUP.md](PI-SETUP.md) prepares the Raspberry Pi capture host,
 [bench-kit.md](bench-kit.md) is the bill of materials with rationale, [APPROACH.md](APPROACH.md)
 is the hour-by-hour bench runbook, and
 [instruments/agilent-6530-qtof/WIRING.md](instruments/agilent-6530-qtof/WIRING.md) is the
