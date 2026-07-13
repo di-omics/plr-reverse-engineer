@@ -8,13 +8,21 @@ commands (status, ready, probe, capture, decode, map) never need those flags.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
 from typing import List
 
-from .capture import Marks, capture_lan, capture_serial
-from .decode import format_diff, load_serial_log, parse_modbus_rtu, scan_modbus_stream
+from .capture import Marks, capture_http, capture_lan, capture_serial
+from .decode import (
+  format_diff,
+  load_serial_log,
+  parse_har,
+  parse_modbus_rtu,
+  scan_modbus_stream,
+  summarize_har,
+)
 from .guards import ActuationNotAllowed, Guards, ProtocolMapIncompleteError
 from .instruments.agilent6530 import (
   Agilent6530Remote,
@@ -23,6 +31,7 @@ from .instruments.agilent6530 import (
   summarize_scan,
 )
 from .instruments.biotage_v10 import BiotageV10
+from .instruments.element_aviti import ElementAviti, RunFolder, probe_services
 from .protocolmap import ProtocolMap, seed
 
 
@@ -119,6 +128,66 @@ def _biotage(args) -> int:
   return 0
 
 
+# -- aviti -------------------------------------------------------------------
+
+
+def _aviti(args) -> int:
+  # Tier 0: run-folder state. No map, no network, read-only file access.
+  if args.action == "watch":
+    if not args.target:
+      print("error: RUN_DIR is required for watch", file=sys.stderr)
+      return 2
+    st = RunFolder(args.target).state()
+    print(json.dumps(st, indent=2))
+    return 0 if st["state"] != "unknown" else 1
+
+  # Read-only network sweep for the control-plane endpoint. No map needed.
+  if args.action == "probe":
+    if not args.target:
+      print("error: IP is required for probe", file=sys.stderr)
+      return 2
+    ports = [int(p) for p in args.ports] if args.ports else None
+    for r in probe_services(args.target, ports):
+      if r.get("open"):
+        print(f"{r['ip']}:{r['port']} open  http_status={r.get('http_status')}")
+      else:
+        print(f"{r['ip']}:{r['port']} closed")
+    return 0
+
+  # API actions: guarded HTTP replay against the ProtocolMap (or the undecoded seed).
+  cfg = {}
+  if args.config:
+    with open(args.config, encoding="utf-8") as fh:
+      cfg = json.load(fh)
+  endpoint = args.endpoint or cfg.get("endpoint")
+  verify_tls = not (args.insecure or cfg.get("verify_tls") is False)
+  token = args.token or cfg.get("token")
+  pm = ProtocolMap.from_json(args.map) if args.map else seed("element_aviti")
+  if endpoint:
+    pm.endpoint = endpoint
+  guards = Guards(armed=args.armed, allow_actuation=args.allow_actuation)
+  dev = ElementAviti(pm=pm, guards=guards, verify_tls=verify_tls, token=token)
+  dev.setup()
+  try:
+    if args.action == "status":
+      print(dev.get_status())
+    elif args.action == "metrics":
+      print(dev.get_run_metrics())
+    elif args.action == "consumables":
+      print(dev.list_consumables())
+    elif args.action == "start":
+      if args.manifest:
+        dev.upload_manifest(args.manifest)
+      dev.start_run()
+      print("start sent" if guards.armed else "start (dry-run)")
+    elif args.action == "abort":
+      dev.abort_run()
+      print("abort sent" if guards.armed else "abort (dry-run)")
+  finally:
+    dev.stop()
+  return 0
+
+
 # -- capture -----------------------------------------------------------------
 
 
@@ -141,6 +210,14 @@ def _capture(args) -> int:
       capture_serial(args.port, args.out, baud=args.baud, seconds=args.seconds)
     except KeyboardInterrupt:
       pass
+    return 0
+  if args.what == "http":
+    proc = capture_http(args.out, listen_port=args.port)
+    print(f"mitmdump capturing -> {args.out} (pid {proc.pid}); point the UI at the proxy")
+    try:
+      proc.wait()
+    except KeyboardInterrupt:
+      proc.terminate()
     return 0
   return 2
 
@@ -180,6 +257,18 @@ def _decode(args) -> int:
       print("register writes (addr, reg -> last value):")
       for (a, r), v in sorted(writes.items()):
         print(f"  addr {a} reg 0x{r:04x} -> {v}")
+    return 0
+  if args.what == "har":
+    calls = parse_har(args.path)
+    rows = summarize_har(calls)
+    print(f"{len(calls)} call(s), {len(rows)} unique endpoint(s) (writes first):")
+    for r in rows:
+      kind = "WRITE" if r["is_write"] else "read "
+      body = " +body" if r["has_body"] else ""
+      poll = " ~status/keep-alive?" if r.get("likely_status") else ""
+      print(
+        f"  [{kind}] {r['method']:<6} {r['path']}  (x{r['count']}{body}){poll}  {r['host']}"
+      )
     return 0
   return 2
 
@@ -239,6 +328,21 @@ def build_parser() -> argparse.ArgumentParser:
   arm_flags(bt)
   bt.set_defaults(func=_biotage)
 
+  av = sub.add_parser("aviti", help="Element AVITI run-state telemetry + guarded API")
+  av.add_argument(
+    "action", choices=["watch", "probe", "status", "metrics", "consumables", "start", "abort"]
+  )
+  av.add_argument("target", nargs="?", help="RUN_DIR (watch) or instrument IP (probe)")
+  av.add_argument("--ports", nargs="*", help="candidate ports (probe only)")
+  av.add_argument("--map", help="decoded ProtocolMap JSON (default: undecoded seed)")
+  av.add_argument("--config", help="endpoint config JSON (endpoint/verify_tls/token)")
+  av.add_argument("--endpoint", help="control-plane base URL, e.g. https://192.168.1.50")
+  av.add_argument("--token", help="bearer token from the recovered auth handshake")
+  av.add_argument("--insecure", action="store_true", help="skip TLS verify (self-signed)")
+  av.add_argument("--manifest", help="RunManifest.csv to stage before start")
+  arm_flags(av)
+  av.set_defaults(func=_aviti)
+
   cap = sub.add_parser("capture", help="capture OEM traffic while marking actions")
   capsub = cap.add_subparsers(dest="what", required=True)
   lan = capsub.add_parser("lan")
@@ -252,6 +356,9 @@ def build_parser() -> argparse.ArgumentParser:
   ser.add_argument("--baud", type=int, default=9600)
   ser.add_argument("--out", required=True, help="output JSONL")
   ser.add_argument("--seconds", type=float)
+  htp = capsub.add_parser("http")
+  htp.add_argument("--out", required=True, help="output HAR for `decode har`")
+  htp.add_argument("--port", type=int, default=8080, help="mitmdump listen port")
   cap.set_defaults(func=_capture)
 
   mk = sub.add_parser("mark", help="standalone interactive action marking")
@@ -267,12 +374,16 @@ def build_parser() -> argparse.ArgumentParser:
   mb.add_argument("frame", help="hex string or file (one RTU frame)")
   mbl = decsub.add_parser("modbus-log")
   mbl.add_argument("path", help="serial capture JSONL from `capture serial`")
+  hr = decsub.add_parser("har")
+  hr.add_argument("path", help="HAR from `capture http` or a browser devtools export")
   dec.set_defaults(func=_decode)
 
   mp = sub.add_parser("map", help="seed, inspect, and check ProtocolMap coverage")
   mpsub = mp.add_subparsers(dest="what", required=True)
   sd = mpsub.add_parser("seed")
-  sd.add_argument("instrument", choices=["facsmelody", "agilent6530", "biotage_v10"])
+  sd.add_argument(
+    "instrument", choices=["facsmelody", "agilent6530", "biotage_v10", "element_aviti"]
+  )
   sd.add_argument("--out", required=True)
   cv = mpsub.add_parser("coverage")
   cv.add_argument("path")

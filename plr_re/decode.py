@@ -11,6 +11,7 @@ Two tools that cover most of the framing work:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -167,3 +168,105 @@ def load_serial_log(path: str) -> bytes:
         continue
       chunks.append(bytes.fromhex(json.loads(line)["hex"]))
   return b"".join(chunks)
+
+
+# -- HTTP / HAR --------------------------------------------------------------
+# The HTTP analog of diff/Modbus. An HTTP/JSON microservice stack (AvitiOS) is
+# reverse-engineered by capturing the UI-to-service traffic as a HAR and reading the
+# API calls out of it: which request an action produced, its method and path, and its
+# JSON body. State-changing verbs (POST/PUT/PATCH/DELETE) are the candidate actuation
+# commands (start_run, abort_run, upload_manifest); GET/HEAD are read-only.
+
+WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@dataclass
+class HttpCall:
+  method: str
+  url: str
+  host: str
+  path: str
+  status: Optional[int]
+  request_body: Optional[str]
+
+  @property
+  def is_write(self) -> bool:
+    return self.method.upper() in WRITE_METHODS
+
+
+def _split_url(url: str) -> Tuple[str, str]:
+  """Return (host, path) from a URL without pulling in urllib for a simple split."""
+  rest = url.split("://", 1)[-1]
+  slash = rest.find("/")
+  if slash < 0:
+    return rest, "/"
+  return rest[:slash], rest[slash:]
+
+
+def parse_har(source) -> List[HttpCall]:
+  """Parse a HAR (dict, JSON text, or file path) into a list of HttpCall.
+
+  A HAR is the standard capture format that browsers export from devtools and that
+  mitmproxy can write, so this is transport-agnostic: it works whether the UI is a
+  local web app or the traffic was intercepted on the wire.
+  """
+  if isinstance(source, str):
+    text = open(source, encoding="utf-8").read() if os.path.exists(source) else source
+    har = json.loads(text)
+  else:
+    har = source
+  calls: List[HttpCall] = []
+  for entry in har.get("log", {}).get("entries", []):
+    req = entry.get("request", {})
+    resp = entry.get("response", {})
+    url = req.get("url", "")
+    host, path = _split_url(url)
+    post = req.get("postData", {}) or {}
+    body = post.get("text")
+    calls.append(
+      HttpCall(
+        method=req.get("method", "GET"),
+        url=url,
+        host=host,
+        path=path,
+        status=resp.get("status"),
+        request_body=body,
+      )
+    )
+  return calls
+
+
+def summarize_har(calls: List[HttpCall]) -> List[dict]:
+  """Fold HTTP calls into unique (method, path) endpoints, marking the writes and the
+  likely status/keep-alive polling.
+
+  This applies the PyLabRobot reverse-engineering heuristics directly. The writes
+  (POST/PUT/PATCH/DELETE) are the reverse-engineering targets: perform one UI action at
+  a time and the state-changing request it produced is the command to record. And, per
+  the PLR guide, "frequently repeated commands are often status/keep-alive messages", so
+  a read endpoint that repeats is flagged as likely polling and sorted to the bottom,
+  out of the way of the action you are looking for.
+  """
+  seen: Dict[Tuple[str, str], dict] = {}
+  for c in calls:
+    key = (c.method.upper(), c.path)
+    row = seen.get(key)
+    if row is None:
+      seen[key] = {
+        "method": c.method.upper(),
+        "path": c.path,
+        "host": c.host,
+        "is_write": c.is_write,
+        "count": 1,
+        "has_body": bool(c.request_body),
+      }
+    else:
+      row["count"] += 1
+      row["has_body"] = row["has_body"] or bool(c.request_body)
+  for row in seen.values():
+    # A repeated read is probably the UI's status/keep-alive poll, not a discrete action.
+    row["likely_status"] = (not row["is_write"]) and row["count"] >= 2
+  # writes first (candidate actuation), meaningful reads next, keep-alive polling last
+  return sorted(
+    seen.values(), key=lambda r: (not r["is_write"], r["likely_status"], r["path"])
+  )

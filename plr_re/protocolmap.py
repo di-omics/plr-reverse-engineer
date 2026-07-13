@@ -24,6 +24,7 @@ class Transport(str, Enum):
   TCP = "tcp"  # raw TCP socket
   USB = "usb"  # PyUSB bulk/interrupt endpoints
   CONTACT_CLOSURE = "contact_closure"  # digital lines over Pi GPIO (APG remote / ERI)
+  HTTP = "http"  # HTTP(S)/JSON control plane (microservice REST API, e.g. AvitiOS)
   UNKNOWN = "unknown"
 
 
@@ -47,6 +48,12 @@ class Command:
   decoded: bool = False
   actuating: bool = False
   notes: str = ""
+  # HTTP/JSON commands (Transport.HTTP) describe a request instead of a byte frame:
+  # method + path, with an optional JSON body template carrying {param} placeholders.
+  # These stay None for byte-frame transports, so one schema covers both.
+  http_method: Optional[str] = None
+  http_path: Optional[str] = None
+  body_template: Optional[str] = None
 
 
 @dataclass
@@ -143,6 +150,20 @@ SEEDS: Dict[str, List[Tuple[str, bool, str]]] = {
     ("start_method", True, "start the evaporation method"),
     ("stop_method", True, "stop the method"),
   ],
+  # Element AVITI: AvitiOS is an HTTP/JSON microservice stack (touchscreen UI and
+  # Elembio Cloud are clients of it). Commands are recovered as request templates,
+  # not byte frames. Read-only run state also has a zero-decode path off the run
+  # folder (RunParameters.json / RunUploaded.json); see instruments/element_aviti.
+  "element_aviti": [
+    ("connect", False, "open/authenticate the AvitiOS local control link"),
+    ("get_status", False, "poll instrument + run state (idle/running/complete/error)"),
+    ("get_run_metrics", False, "read live run metrics (cycle, Q-score, error rate)"),
+    ("list_consumables", False, "read loaded flow cell / reagent / buffer state"),
+    ("upload_manifest", True, "stage a RunManifest.csv for the next run"),
+    ("set_run_parameters", True, "set cycles / recipe / RunParameters for the run"),
+    ("start_run", True, "begin the sequencing run (commits flow cell + reagents)"),
+    ("abort_run", True, "abort the active run"),
+  ],
 }
 
 # Default transport guess per instrument. Discovery on the bench confirms it.
@@ -150,12 +171,14 @@ DEFAULT_TRANSPORT: Dict[str, Transport] = {
   "facsmelody": Transport.UNKNOWN,
   "agilent6530": Transport.TCP,
   "biotage_v10": Transport.SERIAL,
+  "element_aviti": Transport.HTTP,
 }
 
 DEVICE_NAMES: Dict[str, str] = {
   "facsmelody": "BD FACSMelody",
   "agilent6530": "Agilent 6530 Q-TOF",
   "biotage_v10": "Biotage V-10 Touch",
+  "element_aviti": "Element AVITI",
 }
 
 

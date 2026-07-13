@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import socket
 import time
+from dataclasses import dataclass
 from typing import List, Optional, Protocol, Tuple
 
 logger = logging.getLogger("plr_re")
@@ -86,6 +87,99 @@ def open_byte_conn(transport: str, endpoint: str, timeout: float = 1.0) -> ByteC
       return SerialConn(path, baudrate=int(baud), timeout=timeout)
     return SerialConn(endpoint, timeout=timeout)
   raise ValueError(f"open_byte_conn does not handle transport '{transport}'")
+
+
+# -- HTTP(S)/JSON control plane ----------------------------------------------
+# Modern microservice instruments (AvitiOS on the Element AVITI) speak an HTTP/JSON
+# API rather than byte frames. These are stdlib-only (urllib), so the core stays
+# dependency-free. A recording mock backs dry-run and tests.
+
+
+@dataclass
+class HttpResponse:
+  status: int
+  body: bytes
+
+  def json(self):
+    import json  # lazy; body may not be JSON
+
+    return json.loads(self.body.decode("utf-8")) if self.body else None
+
+
+class HttpConnProto(Protocol):
+  def request(
+    self, method: str, path: str, body: Optional[bytes] = None, headers: Optional[dict] = None
+  ) -> "HttpResponse": ...
+  def close(self) -> None: ...
+
+
+class MockHttpConn:
+  """Records requests; returns queued or default responses. Backs dry-run and tests."""
+
+  def __init__(self, responses: Optional[List["HttpResponse"]] = None):
+    self.requests: List[Tuple[str, str, Optional[bytes]]] = []
+    self._responses = list(responses or [])
+
+  def request(
+    self, method: str, path: str, body: Optional[bytes] = None, headers: Optional[dict] = None
+  ) -> "HttpResponse":
+    self.requests.append((method, path, bytes(body) if body is not None else None))
+    return self._responses.pop(0) if self._responses else HttpResponse(200, b"")
+
+  def close(self) -> None:
+    pass
+
+
+class HttpConn:
+  """Real HTTP(S) connection over urllib. `base_url` is the instrument origin, e.g.
+  'https://192.168.1.50'. Self-signed instrument certificates are common, so TLS
+  verification can be turned off deliberately; it stays on by default.
+
+  A bearer token (from the recovered auth handshake) is sent as Authorization if set.
+  This transport only sends what the guarded replayer hands it; it adds no commands of
+  its own.
+  """
+
+  def __init__(
+    self,
+    base_url: str,
+    timeout: float = 5.0,
+    verify_tls: bool = True,
+    token: Optional[str] = None,
+  ):
+    self.base_url = base_url.rstrip("/")
+    self.timeout = timeout
+    self.verify_tls = verify_tls
+    self.token = token
+
+  def request(
+    self, method: str, path: str, body: Optional[bytes] = None, headers: Optional[dict] = None
+  ) -> HttpResponse:
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    url = self.base_url + (path if path.startswith("/") else "/" + path)
+    hdrs = dict(headers or {})
+    if body is not None:
+      hdrs.setdefault("Content-Type", "application/json")
+    if self.token:
+      hdrs.setdefault("Authorization", f"Bearer {self.token}")
+    req = urllib.request.Request(url, data=body, headers=hdrs, method=method.upper())
+    ctx = None
+    if url.startswith("https") and not self.verify_tls:
+      ctx = ssl.create_default_context()
+      ctx.check_hostname = False
+      ctx.verify_mode = ssl.CERT_NONE
+    try:
+      with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as resp:
+        return HttpResponse(resp.status, resp.read())
+    except urllib.error.HTTPError as e:
+      # An HTTP error status is still a real response; hand it back rather than raising.
+      return HttpResponse(e.code, e.read())
+
+  def close(self) -> None:
+    pass
 
 
 # -- contact closure ---------------------------------------------------------
