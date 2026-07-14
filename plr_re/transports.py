@@ -1,8 +1,8 @@
-"""Transports: byte connections (serial, TCP) and a contact-closure GPIO interface.
+"""Transports: byte connections (serial, TCP, USB) and a contact-closure GPIO interface.
 
 Hardware libraries are imported lazily inside the real implementations, so importing
-this module never requires pyserial or gpiozero. Mock implementations back dry-run and
-tests and record what they were asked to do.
+this module never requires pyserial, pyusb, or gpiozero. Mock implementations back
+dry-run and tests and record what they were asked to do.
 """
 
 from __future__ import annotations
@@ -75,9 +75,155 @@ class TcpConn:
     self.sock.close()
 
 
+# -- raw USB bulk ------------------------------------------------------------
+# For an instrument whose control link is a raw USB device rather than a USB-serial
+# bridge (the Namocell raw-USB branch). pyusb is imported lazily, so the core stays
+# dependency-free; install the [usb] extra (pyusb) plus a libusb backend on the host.
+
+
+@dataclass
+class UsbEndpointSpec:
+  """A parsed USB endpoint spec. VID/PID and endpoint addresses are hex (USB
+  identifiers are always hexadecimal); bulk OUT/IN are auto-detected when omitted."""
+
+  vid: int
+  pid: int
+  ep_out: Optional[int] = None
+  ep_in: Optional[int] = None
+  interface: int = 0
+
+
+def parse_usb_endpoint(endpoint: str) -> UsbEndpointSpec:
+  """Parse 'usb:VID:PID[/out=EP,in=EP,iface=N]' into a UsbEndpointSpec.
+
+  VID, PID, and endpoint addresses are hexadecimal, with an optional leading 0x. The
+  'usb:' scheme prefix is optional. Omitted OUT/IN endpoints are resolved from the
+  interface's first bulk endpoints at open time.
+  """
+  spec = endpoint.strip()
+  if spec.lower().startswith("usb:"):
+    spec = spec[4:]
+  opts: dict = {}
+  if "/" in spec:
+    spec, opt_str = spec.split("/", 1)
+    for kv in opt_str.split(","):
+      if not kv.strip():
+        continue
+      key, _, val = kv.partition("=")
+      opts[key.strip().lower()] = val.strip()
+  if ":" not in spec:
+    raise ValueError(
+      f"USB endpoint '{endpoint}' must be 'usb:VID:PID' (hex), e.g. usb:0x1234:0x5678"
+    )
+  vid_s, pid_s = spec.split(":", 1)
+  out = UsbEndpointSpec(vid=int(vid_s, 16), pid=int(pid_s, 16))
+  if "out" in opts:
+    out.ep_out = int(opts["out"], 16)
+  if "in" in opts:
+    out.ep_in = int(opts["in"], 16)
+  if "iface" in opts:
+    # Interface numbers are small decimal indices; accept a 0x prefix for an explicit hex.
+    out.interface = int(opts["iface"], 0)
+  return out
+
+
+class UsbConn:
+  """Real raw-USB bulk connection over pyusb.
+
+  `endpoint` is 'usb:VID:PID[/out=EP,in=EP,iface=N]'. Finds the device, claims the
+  interface (detaching a kernel driver on Linux where possible), and writes/reads over
+  its bulk OUT/IN endpoints. A read timeout returns empty rather than raising, matching
+  the other byte connections. This transports only what the guarded replayer hands it;
+  it adds no commands of its own.
+  """
+
+  def __init__(self, endpoint, timeout: float = 1.0):
+    try:
+      import usb.core  # lazy; part of the [usb] extra
+      import usb.util
+    except ImportError as e:
+      raise RuntimeError(
+        "USB transport needs pyusb; `pip install .[usb]` (and a libusb backend on the "
+        "host). If the link is a USB-serial bridge, use transport 'serial' instead."
+      ) from e
+
+    self._util = usb.util
+    self._USBError = usb.core.USBError
+    self.timeout_ms = int(timeout * 1000)
+    spec = parse_usb_endpoint(endpoint) if isinstance(endpoint, str) else endpoint
+
+    try:
+      dev = usb.core.find(idVendor=spec.vid, idProduct=spec.pid)
+    except usb.core.NoBackendError as e:
+      # pyusb is pure Python and imports fine, but the native libusb library it drives
+      # was not found. This is the missing-backend case the message above refers to; it
+      # only surfaces here, on the first call that actually touches the backend.
+      raise RuntimeError(
+        "USB transport needs a native libusb backend on the host (pyusb is installed "
+        "but no libusb library was found); install libusb (e.g. `brew install libusb` "
+        "or `apt install libusb-1.0-0`), or use transport 'serial' if the link is a "
+        "USB-serial bridge."
+      ) from e
+    if dev is None:
+      raise RuntimeError(
+        f"no USB device {spec.vid:04x}:{spec.pid:04x} found; check it is connected and "
+        "that you have permission (udev rule / run as a user that can claim it)."
+      )
+    # A kernel driver may hold the interface on Linux; release it if we can.
+    try:
+      if dev.is_kernel_driver_active(spec.interface):
+        dev.detach_kernel_driver(spec.interface)
+    except (NotImplementedError, self._USBError):
+      pass
+    dev.set_configuration()
+    cfg = dev.get_active_configuration()
+    intf = cfg[(spec.interface, 0)]
+    self.dev = dev
+    self.intf = intf
+    self._ep_out = self._resolve_ep(spec.ep_out, usb.util.ENDPOINT_OUT)
+    self._ep_in = self._resolve_ep(spec.ep_in, usb.util.ENDPOINT_IN)
+
+  def _resolve_ep(self, explicit: Optional[int], direction):
+    if explicit is not None:
+      ep = self._util.find_descriptor(self.intf, bEndpointAddress=explicit)
+      if ep is None:
+        raise RuntimeError(f"USB endpoint 0x{explicit:02x} not present on the interface")
+      return ep
+    ep = self._util.find_descriptor(
+      self.intf,
+      custom_match=lambda e: (
+        self._util.endpoint_direction(e.bEndpointAddress) == direction
+        and self._util.endpoint_type(e.bmAttributes) == self._util.ENDPOINT_TYPE_BULK
+      ),
+    )
+    if ep is None:
+      side = "OUT" if direction == self._util.ENDPOINT_OUT else "IN"
+      raise RuntimeError(
+        f"no bulk {side} endpoint on the interface; give it explicitly with "
+        "/out=0xNN,in=0xNN once identified from a usbmon capture."
+      )
+    return ep
+
+  def write(self, data: bytes) -> None:
+    self._ep_out.write(bytes(data), timeout=self.timeout_ms)
+
+  def read(self, size: int = 512) -> bytes:
+    try:
+      return bytes(self._ep_in.read(size, timeout=self.timeout_ms))
+    except self._USBError:
+      # A timeout with no data pending is normal for a read poll; report empty.
+      return b""
+
+  def close(self) -> None:
+    try:
+      self._util.dispose_resources(self.dev)
+    except Exception:  # noqa: BLE001 - best-effort cleanup
+      pass
+
+
 def open_byte_conn(transport: str, endpoint: str, timeout: float = 1.0) -> ByteConn:
   """Open a real byte connection. `endpoint` is 'host:port' for TCP, a device path
-  (optionally 'path@baud') for serial."""
+  (optionally 'path@baud') for serial, or 'usb:VID:PID[/out=EP,in=EP]' for raw USB."""
   if transport == "tcp":
     host, port = endpoint.rsplit(":", 1)
     return TcpConn(host, int(port), timeout=timeout)
@@ -86,6 +232,8 @@ def open_byte_conn(transport: str, endpoint: str, timeout: float = 1.0) -> ByteC
       path, baud = endpoint.rsplit("@", 1)
       return SerialConn(path, baudrate=int(baud), timeout=timeout)
     return SerialConn(endpoint, timeout=timeout)
+  if transport == "usb":
+    return UsbConn(endpoint, timeout=timeout)
   raise ValueError(f"open_byte_conn does not handle transport '{transport}'")
 
 

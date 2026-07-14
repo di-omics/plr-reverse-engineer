@@ -51,14 +51,17 @@ interface:
 
 1. `sudo modprobe usbmon`
 2. Find the bus the instrument is on with `lsusb` (note the VID:PID and bus number).
-3. Capture that bus: `tshark -i usbmon0 -w namocell-usb.pcap` (match the bus number).
+3. Capture that bus: `plr-re capture usb --iface usbmon0 --out namocell-usb.pcap --mark`
+   (match the bus number; this shells to dumpcap/tshark, same as the LAN capture).
 4. Perform and mark one action at a time as below.
 5. Filter to the instrument's device in Wireshark and read the bulk-transfer payloads;
    those payloads are the frames to feed to `plr-re decode diff`.
 
-Raw USB means a pyusb-backed byte connection has to be added to the toolkit before armed
-replay (the map's transport becomes `usb`); the capture and decode steps are otherwise
-the same.
+For armed replay the map's transport becomes `usb` with endpoint
+`usb:VID:PID[/out=EP,in=EP]`, served by the toolkit's pyusb byte connection (install the
+`[usb]` extra: `pip install .[usb]` plus a libusb backend on the host). The bulk OUT/IN
+endpoint addresses are auto-detected from the interface, or set explicitly once the
+usbmon capture identifies them. Capture and decode are otherwise the same as serial.
 
 ## What to capture (one small action per mark)
 

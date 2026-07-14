@@ -14,7 +14,7 @@ import os
 import sys
 from typing import List
 
-from .capture import Marks, capture_http, capture_lan, capture_serial
+from .capture import Marks, capture_http, capture_lan, capture_serial, capture_usb
 from .decode import (
   format_diff,
   load_serial_log,
@@ -268,6 +268,18 @@ def _capture(args) -> int:
     except KeyboardInterrupt:
       pass
     return 0
+  if args.what == "usb":
+    proc = capture_usb(args.iface, args.out, seconds=args.seconds)
+    print(f"capturing usbmon {args.iface} -> {args.out} (pid {proc.pid})")
+    if args.mark:
+      Marks(args.out + ".marks.jsonl").run_interactive()
+      proc.terminate()
+    else:
+      try:
+        proc.wait()
+      except KeyboardInterrupt:
+        proc.terminate()
+    return 0
   if args.what == "http":
     proc = capture_http(args.out, listen_port=args.port)
     print(f"mitmdump capturing -> {args.out} (pid {proc.pid}); point the UI at the proxy")
@@ -428,6 +440,11 @@ def build_parser() -> argparse.ArgumentParser:
   ser.add_argument("--baud", type=int, default=9600)
   ser.add_argument("--out", required=True, help="output JSONL")
   ser.add_argument("--seconds", type=float)
+  usbc = capsub.add_parser("usb", help="capture a usbmon interface (raw USB)")
+  usbc.add_argument("--iface", required=True, help="usbmon interface, e.g. usbmon0")
+  usbc.add_argument("--out", required=True, help="output pcap")
+  usbc.add_argument("--seconds", type=float)
+  usbc.add_argument("--mark", action="store_true", help="interactive action marking")
   htp = capsub.add_parser("http")
   htp.add_argument("--out", required=True, help="output HAR for `decode har`")
   htp.add_argument("--port", type=int, default=8080, help="mitmdump listen port")

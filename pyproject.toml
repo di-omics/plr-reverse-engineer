@@ -15,6 +15,7 @@ dependencies = []
 # Hardware extras are optional and imported lazily.
 [project.optional-dependencies]
 serial = ["pyserial>=3.5"]
+usb = ["pyusb>=1.2"]
 pi = ["gpiozero>=2.0", "lgpio>=0.2"]
 dev = ["pytest>=7"]
 

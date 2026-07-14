@@ -60,8 +60,8 @@ From cheapest and safest to hardest:
 
 - **Tier 1: resolve the transport branch.** Confirm whether the control link is USB-serial
   (record `path@baud`, transport `serial`) or a raw USB bulk device (transport `usb`,
-  which needs a pyusb byte connection added to the toolkit). Record the answer as
-  `ProtocolMap.transport` and `endpoint`.
+  endpoint `usb:VID:PID[/out=EP,in=EP]`, served by the toolkit's pyusb byte connection in
+  the `[usb]` extra). Record the answer as `ProtocolMap.transport` and `endpoint`.
 
 - **Tier 2: recover the command set (the reverse engineering proper).** With capture
   running (see [CAPTURE.md](CAPTURE.md)), drive the OEM software through one discrete

@@ -75,7 +75,7 @@ loop rather than a manual one.
 ## Quickstart (the toolkit)
 
 ```
-pip install -e .            # core is stdlib-only; add [serial] or [pi] extras on the Pi
+pip install -e .            # core is stdlib-only; add [serial], [usb], or [pi] extras on the Pi
 
 # Tier 0 mass spec, contact closure. Dry-run by default (logs, touches nothing):
 plr-re agilent status --config configs/agilent-pinmap.example.json
@@ -97,6 +97,7 @@ plr-re namocell sort --protocol single_gfp --plate 384      # dry-run: previews 
 # Capture OEM traffic while you mark each discrete action:
 plr-re capture lan --iface eth1 --hosts 169.254.1.10 --out cap.pcap --mark
 plr-re capture serial --port /dev/ttyUSB0 --baud 19200 --out v10.jsonl
+plr-re capture usb --iface usbmon0 --out namocell-usb.pcap --mark   # raw-USB (usbmon)
 plr-re capture http --out aviti.har                         # AvitiOS UI/service traffic
 
 # Decode: diff two single-parameter frames, decode one Modbus frame, scan a whole

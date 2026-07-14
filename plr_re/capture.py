@@ -1,12 +1,14 @@
 """Capture harness: record OEM-to-device traffic while you mark discrete UI actions.
 
-This makes step 2 of every playbook one command. Two transports:
+This makes step 2 of every playbook one command. Three transports:
 
   * LAN: shells out to dumpcap/tshark to write a pcap (Agilent Tier 2).
   * Serial: reads a pyserial port and logs timestamped bytes (Biotage HMI bus).
+  * USB: shells out to dumpcap/tshark on a usbmon interface to write a pcap (the
+    Namocell raw-USB branch).
 
-Alongside either, a marks file records the wall-clock instant you performed each named
-action, so the capture slices into action-aligned windows for correlation later.
+Alongside any of them, a marks file records the wall-clock instant you performed each
+named action, so the capture slices into action-aligned windows for correlation later.
 """
 
 from __future__ import annotations
@@ -80,6 +82,26 @@ def capture_lan(
   if shutil.which("dumpcap") is None and shutil.which("tshark") is None:
     raise RuntimeError("neither dumpcap nor tshark found on PATH; install Wireshark")
   cmd = lan_capture_command(iface, out_pcap, hosts)
+  if seconds is not None:
+    cmd += ["-a", f"duration:{int(seconds)}"]
+  return subprocess.Popen(cmd)
+
+
+def capture_usb(iface: str, out_pcap: str, seconds: Optional[float] = None) -> subprocess.Popen:
+  """Start a raw-USB capture on a usbmon interface (e.g. 'usbmon0'), writing a pcap.
+
+  On Linux, `sudo modprobe usbmon` first, then find the bus with `lsusb` and capture
+  that bus's usbmon interface. This reuses the same dumpcap/tshark path as the LAN
+  capture; the only difference is a usbmon interface takes no host filter. Filter the
+  pcap to the instrument's device in Wireshark and read the bulk-transfer payloads into
+  `plr-re decode diff`.
+  """
+  if shutil.which("dumpcap") is None and shutil.which("tshark") is None:
+    raise RuntimeError(
+      "neither dumpcap nor tshark found on PATH; install Wireshark, and "
+      "`sudo modprobe usbmon` to expose the usbmon interfaces."
+    )
+  cmd = lan_capture_command(iface, out_pcap)  # same tool path; no host filter for usbmon
   if seconds is not None:
     cmd += ["-a", f"duration:{int(seconds)}"]
   return subprocess.Popen(cmd)

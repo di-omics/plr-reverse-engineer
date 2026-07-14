@@ -1,5 +1,5 @@
 {
   "transport": "serial",
   "endpoint": "/dev/ttyUSB0@115200",
-  "_comment": "Namocell Hana control link found with `plr-re namocell discover`. transport is 'serial' for a USB-serial bridge (FTDI/CP210x/etc.), or 'usb' for a raw USB device once a pyusb byte connection is added; for serial, endpoint is 'path@baud'. The baud rate is a bench unknown until confirmed. Pass with `plr-re namocell status --config configs/namocell.example.json`."
+  "_comment": "Namocell Hana control link found with `plr-re namocell discover`. transport is 'serial' for a USB-serial bridge (FTDI/CP210x/etc.), endpoint 'path@baud'; or 'usb' for a raw USB device (install the [usb] extra: pyusb + a libusb backend), endpoint 'usb:VID:PID[/out=EP,in=EP]'. The baud rate (serial) and endpoint addresses (usb) are bench unknowns until confirmed. Pass with `plr-re namocell status --config configs/namocell.example.json`."
 }
