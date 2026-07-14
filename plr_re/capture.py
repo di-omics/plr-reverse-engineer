@@ -85,6 +85,37 @@ def capture_lan(
   return subprocess.Popen(cmd)
 
 
+def http_capture_command(out_har: str, listen_port: int = 8080) -> List[str]:
+  """Build a mitmdump command that intercepts HTTP(S) and writes a HAR.
+
+  mitmproxy sits between the AvitiOS UI (or Elembio Cloud client) and the service and
+  writes a HAR that `plr-re decode har` reads. Recent mitmproxy writes HAR via the
+  `hardump` option. Point the client at this proxy and trust its CA to see inside TLS.
+  """
+  return [
+    "mitmdump",
+    "--listen-port",
+    str(listen_port),
+    "--set",
+    f"hardump={out_har}",
+  ]
+
+
+def capture_http(out_har: str, listen_port: int = 8080) -> subprocess.Popen:
+  """Start an HTTP(S) capture via mitmdump, writing a HAR for `decode har`.
+
+  Requires mitmproxy (`pip install mitmproxy`). If the UI is a local web app you can
+  reach with browser devtools, the zero-install alternative is to export a HAR from the
+  Network tab and skip this entirely; `decode har` consumes either.
+  """
+  if shutil.which("mitmdump") is None:
+    raise RuntimeError(
+      "mitmdump not found on PATH; `pip install mitmproxy`, or export a HAR from the "
+      "UI's browser devtools Network tab and pass it straight to `plr-re decode har`."
+    )
+  return subprocess.Popen(http_capture_command(out_har, listen_port))
+
+
 def capture_serial(port: str, out_path: str, baud: int = 9600, seconds: Optional[float] = None):
   """Log timestamped serial bytes to `out_path` (JSONL of {t, hex}). Blocks until
   `seconds` elapse, or until interrupted. Requires pyserial."""

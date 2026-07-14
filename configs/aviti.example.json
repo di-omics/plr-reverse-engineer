@@ -1,0 +1,6 @@
+{
+  "endpoint": "https://192.168.1.50",
+  "verify_tls": false,
+  "token": null,
+  "_comment": "AvitiOS control-plane base URL discovered with `plr-re aviti probe <ip>`. verify_tls is false because instrument certificates are commonly self-signed; set token once the auth handshake is recovered. Pass with `plr-re aviti status --config configs/aviti.example.json`."
+}
