@@ -164,6 +164,22 @@ SEEDS: Dict[str, List[Tuple[str, bool, str]]] = {
     ("start_run", True, "begin the sequencing run (commits flow cell + reagents)"),
     ("abort_run", True, "abort the active run"),
   ],
+  # Namocell Hana: a benchtop single-cell dispenser driven by a bundled Windows PC
+  # over a byte link (USB-serial the strong prior; confirmed on the bench). It sorts
+  # and dispenses cells from a disposable microfluidic cartridge on fluorescence /
+  # light scatter into 96/384-well plates. Command shape mirrors a cell sorter; the
+  # read-only USB discovery path needs no decoding (see instruments/namocell).
+  "namocell": [
+    ("connect", False, "open the control link / handshake with the dispenser"),
+    ("get_status", False, "poll state (idle/sorting/error, cartridge presence, pressure)"),
+    ("load_protocol", False, "select sort mode (single/bulk) and the gate on scatter/fluor"),
+    ("set_deposition", True, "set plate format (96/384) + cells-per-well and stage the plate"),
+    ("prime", True, "seat the cartridge and bring fluidics to sort pressure; verify stable"),
+    ("start_sort", True, "begin dispensing single cells into the staged plate"),
+    ("wait_complete", False, "block/poll until the plate (or bulk target) is complete"),
+    ("abort", True, "emergency stop the sort"),
+    ("clean", True, "run the flush/clean cycle and eject the cartridge between samples"),
+  ],
 }
 
 # Default transport guess per instrument. Discovery on the bench confirms it.
@@ -172,6 +188,8 @@ DEFAULT_TRANSPORT: Dict[str, Transport] = {
   "agilent6530": Transport.TCP,
   "biotage_v10": Transport.SERIAL,
   "element_aviti": Transport.HTTP,
+  # UNKNOWN until bench discovery resolves USB-serial vs raw USB bulk; strong USB prior.
+  "namocell": Transport.UNKNOWN,
 }
 
 DEVICE_NAMES: Dict[str, str] = {
@@ -179,6 +197,7 @@ DEVICE_NAMES: Dict[str, str] = {
   "agilent6530": "Agilent 6530 Q-TOF",
   "biotage_v10": "Biotage V-10 Touch",
   "element_aviti": "Element AVITI",
+  "namocell": "Namocell Hana",
 }
 
 

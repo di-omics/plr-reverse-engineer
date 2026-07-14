@@ -32,15 +32,18 @@ and the talk ["How To Reverse Engineer Lab Equipment"](https://www.youtube.com/w
 | Agilent 6530 Q-TOF | Accurate-mass LC/MS | [instruments/agilent-6530-qtof](instruments/agilent-6530-qtof/README.md) | Priority; Tier 0 contact closure needs no decoding, LAN control map in progress |
 | Biotage V-10 Touch | Solvent evaporator | [instruments/biotage-v10-touch](instruments/biotage-v10-touch/README.md) | Transport branch resolved on the bench, then ProtocolMap recovery |
 | Element AVITI | DNA sequencer (NGS) | [instruments/element-aviti](instruments/element-aviti/README.md) | Tier 0 run-folder telemetry works today; HTTP/JSON control API being recovered |
+| Namocell Hana | Single-cell dispenser | [instruments/namocell-hana](instruments/namocell-hana/README.md) | Tier 0 USB discovery works today; byte command set being recovered |
 
 [PREFLIGHT.md](PREFLIGHT.md) is the checkbox buy-and-pack checklist,
 [PI-SETUP.md](PI-SETUP.md) prepares the Raspberry Pi capture host,
 [bench-kit.md](bench-kit.md) is the bill of materials with rationale, [APPROACH.md](APPROACH.md)
 is the hour-by-hour bench runbook,
 [instruments/agilent-6530-qtof/WIRING.md](instruments/agilent-6530-qtof/WIRING.md) is the
-contact-closure wiring with the APG pinout, and
+contact-closure wiring with the APG pinout,
 [instruments/element-aviti/CAPTURE.md](instruments/element-aviti/CAPTURE.md) is how to
-capture the AVITI control-plane traffic for decoding.
+capture the AVITI control-plane traffic for decoding, and
+[instruments/namocell-hana/CAPTURE.md](instruments/namocell-hana/CAPTURE.md) is how to
+capture the Namocell host-to-instrument byte traffic.
 
 ## Can I plug in and go?
 
@@ -54,8 +57,13 @@ Partly, and the honest split matters:
   to an output folder, ending with `RunUploaded.json` (which carries an `outcome`).
   `plr-re aviti watch <run_dir>` reports running/complete/outcome with no decoding and no
   risk, so an orchestrator gets honest run state and a clean hand-off to Bases2Fastq.
+- **Namocell Tier 0 (transport discovery): yes, read-only, today.** The Hana is a byte-
+  protocol instrument with no plug-in-and-go control path, but `plr-re namocell discover`
+  enumerates the USB/serial link read-only, with no decoding, to find the wire before
+  capture. Driving the dispenser is a bench capture-and-decode job like the FACSMelody.
 - **Decoded protocol control (LAN for the Q-TOF, the HMI bus for the V-10, the AvitiOS
-  HTTP API for the AVITI): not before the bench.** By definition: the commands are unknown
+  HTTP API for the AVITI, the byte link for the Hana): not before the bench.** By
+  definition: the commands are unknown
   until you capture them from the instrument, so no one can pre-bake a working `start_run`
   or `set_temperature`. What is baked is the tooling that makes each step one command:
   capture with action marking, a byte-diff correlator, a Modbus decoder, a HAR decoder,
@@ -80,6 +88,11 @@ plr-re agilent probe 169.254.1.10                           # Tier 1 LAN, read-o
 plr-re aviti watch /mnt/aviti-output/20260713_AV1_run42     # running/complete/outcome
 plr-re aviti probe 192.168.1.50                             # find the control endpoint
 plr-re aviti status --config configs/aviti.example.json     # dry-run until armed
+
+# Namocell Hana. Tier 0 USB/serial discovery is read-only and needs no decoding:
+plr-re namocell discover                                    # find the control link
+plr-re namocell status --config configs/namocell.example.json          # dry-run until armed
+plr-re namocell sort --protocol single_gfp --plate 384      # dry-run: previews the sequence
 
 # Capture OEM traffic while you mark each discrete action:
 plr-re capture lan --iface eth1 --hosts 169.254.1.10 --out cap.pcap --mark

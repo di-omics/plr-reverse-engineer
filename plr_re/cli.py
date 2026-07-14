@@ -32,7 +32,8 @@ from .instruments.agilent6530 import (
 )
 from .instruments.biotage_v10 import BiotageV10
 from .instruments.element_aviti import ElementAviti, RunFolder, probe_services
-from .protocolmap import ProtocolMap, seed
+from .instruments.namocell import NamocellDispenser, discover_usb
+from .protocolmap import ProtocolMap, Transport, seed
 
 
 def _log_setup():
@@ -183,6 +184,62 @@ def _aviti(args) -> int:
     elif args.action == "abort":
       dev.abort_run()
       print("abort sent" if guards.armed else "abort (dry-run)")
+  finally:
+    dev.stop()
+  return 0
+
+
+# -- namocell ----------------------------------------------------------------
+
+
+def _namocell(args) -> int:
+  # Read-only transport discovery: enumerate the USB/serial wire. No map, no session.
+  if args.action == "discover":
+    cands = discover_usb()
+    if not cands:
+      print("no USB/serial candidates found (is the instrument powered and connected?)")
+      return 1
+    for c in cands:
+      vid = f"{c['vid']:04x}" if c.get("vid") is not None else "----"
+      pid = f"{c['pid']:04x}" if c.get("pid") is not None else "----"
+      tag = "  <-- candidate control link" if c.get("likely_control") else ""
+      desc = c.get("description") or ""
+      print(f"{c['path']}  vid:pid={vid}:{pid}  {desc}{tag}")
+    return 0
+
+  # Control actions: guarded byte replay against the ProtocolMap (or the undecoded seed).
+  cfg = {}
+  if args.config:
+    with open(args.config, encoding="utf-8") as fh:
+      cfg = json.load(fh)
+  pm = ProtocolMap.from_json(args.map) if args.map else seed("namocell")
+  if cfg.get("transport"):
+    pm.transport = Transport(cfg["transport"])
+  endpoint = args.endpoint or cfg.get("endpoint")
+  if endpoint:
+    pm.endpoint = endpoint
+  guards = Guards(armed=args.armed, allow_actuation=args.allow_actuation)
+  dev = NamocellDispenser(pm=pm, guards=guards)
+  dev.setup()
+  try:
+    if args.action == "status":
+      print(dev.get_status())
+    elif args.action == "prime":
+      dev.prime()
+      print("prime sent" if guards.armed else "prime (dry-run)")
+    elif args.action == "sort":
+      if args.protocol:
+        dev.load_protocol(args.protocol)
+      dev.set_deposition(args.plate, args.cells_per_well)
+      dev.prime()
+      dev.start_sort()
+      print("sort started" if guards.armed else "sort (dry-run)")
+    elif args.action == "abort":
+      dev.abort()
+      print("abort sent" if guards.armed else "abort (dry-run)")
+    elif args.action == "clean":
+      dev.clean()
+      print("clean sent" if guards.armed else "clean (dry-run)")
   finally:
     dev.stop()
   return 0
@@ -343,6 +400,21 @@ def build_parser() -> argparse.ArgumentParser:
   arm_flags(av)
   av.set_defaults(func=_aviti)
 
+  nm = sub.add_parser("namocell", help="Namocell Hana USB discovery + guarded dispense")
+  nm.add_argument("action", choices=["discover", "status", "prime", "sort", "abort", "clean"])
+  nm.add_argument("--map", help="decoded ProtocolMap JSON (default: undecoded seed)")
+  nm.add_argument("--config", help="transport/endpoint config JSON (transport/endpoint)")
+  nm.add_argument("--endpoint", help="control link, e.g. /dev/ttyUSB0@115200 (serial)")
+  nm.add_argument("--protocol", help="OEM sort protocol name to load (sort only)")
+  nm.add_argument(
+    "--plate", type=int, default=96, choices=[96, 384], help="destination plate format"
+  )
+  nm.add_argument(
+    "--cells-per-well", type=int, default=1, dest="cells_per_well", help="target cells/well"
+  )
+  arm_flags(nm)
+  nm.set_defaults(func=_namocell)
+
   cap = sub.add_parser("capture", help="capture OEM traffic while marking actions")
   capsub = cap.add_subparsers(dest="what", required=True)
   lan = capsub.add_parser("lan")
@@ -382,7 +454,8 @@ def build_parser() -> argparse.ArgumentParser:
   mpsub = mp.add_subparsers(dest="what", required=True)
   sd = mpsub.add_parser("seed")
   sd.add_argument(
-    "instrument", choices=["facsmelody", "agilent6530", "biotage_v10", "element_aviti"]
+    "instrument",
+    choices=["facsmelody", "agilent6530", "biotage_v10", "element_aviti", "namocell"],
   )
   sd.add_argument("--out", required=True)
   cv = mpsub.add_parser("coverage")

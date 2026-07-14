@@ -8,3 +8,4 @@ dist/
 *.pcap
 *.har
 *.marks.jsonl
+*.jsonl
