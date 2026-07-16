@@ -1,0 +1,5 @@
+{
+  "transport": "serial",
+  "endpoint": "/dev/ttyUSB0@115200",
+  "_comment": "Integra VIAFLO 96 control link found with `plr-re viaflo discover`. The pipette connects over USB Type A-to-B (directly, or via the programming stand / communication module). transport is 'serial' for a USB-serial / virtual-COM link (the strong prior; endpoint 'path@baud'), or 'usb' for a raw USB device once a pyusb byte connection is added. The baud rate is a bench unknown until confirmed. Set the installed pipetting head's max volume with --max-volume (e.g. 12.5, 125, 300, or 1250 uL heads). Pass with `plr-re viaflo status --config configs/viaflo96.example.json`."
+}

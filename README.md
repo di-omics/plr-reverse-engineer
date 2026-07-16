@@ -33,6 +33,7 @@ and the talk ["How To Reverse Engineer Lab Equipment"](https://www.youtube.com/w
 | Biotage V-10 Touch | Solvent evaporator | [instruments/biotage-v10-touch](instruments/biotage-v10-touch/README.md) | Transport branch resolved on the bench, then ProtocolMap recovery |
 | Element AVITI | DNA sequencer (NGS) | [instruments/element-aviti](instruments/element-aviti/README.md) | Tier 0 run-folder telemetry works today; HTTP/JSON control API being recovered |
 | Namocell Hana | Single-cell dispenser | [instruments/namocell-hana](instruments/namocell-hana/README.md) | Tier 0 USB discovery works today; byte command set being recovered |
+| Integra VIAFLO 96 | 96-channel electronic pipette | [instruments/integra-viaflo-96](instruments/integra-viaflo-96/README.md) | Tier 0 USB discovery works today; program-transfer command set being recovered |
 
 [PREFLIGHT.md](PREFLIGHT.md) is the checkbox buy-and-pack checklist,
 [PI-SETUP.md](PI-SETUP.md) prepares the Raspberry Pi capture host,
@@ -43,7 +44,9 @@ contact-closure wiring with the APG pinout,
 [instruments/element-aviti/CAPTURE.md](instruments/element-aviti/CAPTURE.md) is how to
 capture the AVITI control-plane traffic for decoding, and
 [instruments/namocell-hana/CAPTURE.md](instruments/namocell-hana/CAPTURE.md) is how to
-capture the Namocell host-to-instrument byte traffic.
+capture the Namocell host-to-instrument byte traffic, and
+[instruments/integra-viaflo-96/CAPTURE.md](instruments/integra-viaflo-96/CAPTURE.md) is how
+to capture the VIAFLO 96 host-to-instrument USB traffic.
 
 ## Can I plug in and go?
 
@@ -61,9 +64,15 @@ Partly, and the honest split matters:
   protocol instrument with no plug-in-and-go control path, but `plr-re namocell discover`
   enumerates the USB/serial link read-only, with no decoding, to find the wire before
   capture. Driving the dispenser is a bench capture-and-decode job like the FACSMelody.
+- **VIAFLO 96 Tier 0 (transport discovery): yes, read-only, today.** The VIAFLO 96 is
+  programmed by INTEGRA's VIALINK over USB and runs the uploaded program standalone; there
+  is no plug-in-and-go control path, but `plr-re viaflo discover` enumerates the USB/serial
+  link read-only, with no decoding, to find the wire before capture. Driving the pipette
+  headlessly is a bench job: decode how VIALINK serializes and uploads a program, then
+  upload and run it behind the guards.
 - **Decoded protocol control (LAN for the Q-TOF, the HMI bus for the V-10, the AvitiOS
-  HTTP API for the AVITI, the byte link for the Hana): not before the bench.** By
-  definition: the commands are unknown
+  HTTP API for the AVITI, the byte link for the Hana, the USB program transfer for the
+  VIAFLO 96): not before the bench.** By definition: the commands are unknown
   until you capture them from the instrument, so no one can pre-bake a working `start_run`
   or `set_temperature`. What is baked is the tooling that makes each step one command:
   capture with action marking, a byte-diff correlator, a Modbus decoder, a HAR decoder,
@@ -93,6 +102,11 @@ plr-re aviti status --config configs/aviti.example.json     # dry-run until arme
 plr-re namocell discover                                    # find the control link
 plr-re namocell status --config configs/namocell.example.json          # dry-run until armed
 plr-re namocell sort --protocol single_gfp --plate 384      # dry-run: previews the sequence
+
+# Integra VIAFLO 96. Tier 0 USB/serial discovery is read-only and needs no decoding:
+plr-re viaflo discover                                      # find the control link
+plr-re viaflo status --config configs/viaflo96.example.json            # dry-run until armed
+plr-re viaflo run --program serial_dilution                 # dry-run: previews select+run (upload separately)
 
 # Capture OEM traffic while you mark each discrete action:
 plr-re capture lan --iface eth1 --hosts 169.254.1.10 --out cap.pcap --mark

@@ -180,6 +180,25 @@ SEEDS: Dict[str, List[Tuple[str, bool, str]]] = {
     ("abort", True, "emergency stop the sort"),
     ("clean", True, "run the flush/clean cycle and eject the cartridge between samples"),
   ],
+  # Integra VIAFLO 96: a benchtop 96-channel electronic pipette programmed on its own
+  # touchscreen and by INTEGRA's VIALINK software over a USB link (Type A-to-B, via the
+  # programming stand or communication module). Its control model is program transfer,
+  # not a live command stream: VIALINK serializes a whole pipetting program, uploads it
+  # into device memory, and the pipette then runs it standalone. So the headless-control
+  # commands are telemetry + upload + select + run + stop; the per-step aspirate/dispense
+  # semantics live inside the uploaded program. The read-only USB/serial discovery path
+  # needs no decoding and is shared with the Namocell path (see instruments/viaflo96).
+  "viaflo96": [
+    ("connect", False, "open the USB control link / handshake with the pipette (or comm module)"),
+    ("get_status", False, "poll device state (idle/running/error, tips, head/plunger pos, battery)"),
+    ("get_identity", False, "read model / serial / firmware version (the VIALINK library read)"),
+    ("list_programs", False, "enumerate the custom programs currently stored on the pipette"),
+    ("select_program", False, "set the active program to run next (selection only; no motion)"),
+    ("upload_program", True, "transfer a serialized pipetting program into device memory"),
+    ("home", True, "home the pipetting head (Z) to a known safe position"),
+    ("run_program", True, "execute the active program (the whole aspirate/dispense sequence)"),
+    ("abort", True, "stop the running program / e-stop the head"),
+  ],
 }
 
 # Default transport guess per instrument. Discovery on the bench confirms it.
@@ -190,6 +209,8 @@ DEFAULT_TRANSPORT: Dict[str, Transport] = {
   "element_aviti": Transport.HTTP,
   # UNKNOWN until bench discovery resolves USB-serial vs raw USB bulk; strong USB prior.
   "namocell": Transport.UNKNOWN,
+  # UNKNOWN until the bench resolves USB-serial / virtual-COM vs raw USB; strong USB prior.
+  "viaflo96": Transport.UNKNOWN,
 }
 
 DEVICE_NAMES: Dict[str, str] = {
@@ -198,6 +219,7 @@ DEVICE_NAMES: Dict[str, str] = {
   "biotage_v10": "Biotage V-10 Touch",
   "element_aviti": "Element AVITI",
   "namocell": "Namocell Hana",
+  "viaflo96": "Integra VIAFLO 96",
 }
 
 

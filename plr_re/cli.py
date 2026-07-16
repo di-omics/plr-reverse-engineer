@@ -33,6 +33,7 @@ from .instruments.agilent6530 import (
 from .instruments.biotage_v10 import BiotageV10
 from .instruments.element_aviti import ElementAviti, RunFolder, probe_services
 from .instruments.namocell import NamocellDispenser, discover_usb
+from .instruments.viaflo96 import IntegraViaflo96
 from .protocolmap import ProtocolMap, Transport, seed
 
 
@@ -245,6 +246,66 @@ def _namocell(args) -> int:
   return 0
 
 
+# -- viaflo ------------------------------------------------------------------
+
+
+def _viaflo(args) -> int:
+  # Read-only transport discovery reuses the same USB/serial enumerator as the Namocell
+  # path (it is transport-generic). No map, no session; it lists what is present.
+  if args.action == "discover":
+    cands = discover_usb()
+    if not cands:
+      print("no USB/serial candidates found (is the pipette powered and connected?)")
+      return 1
+    for c in cands:
+      vid = f"{c['vid']:04x}" if c.get("vid") is not None else "----"
+      pid = f"{c['pid']:04x}" if c.get("pid") is not None else "----"
+      tag = "  <-- candidate control link" if c.get("likely_control") else ""
+      desc = c.get("description") or ""
+      print(f"{c['path']}  vid:pid={vid}:{pid}  {desc}{tag}")
+    return 0
+
+  # Control actions: guarded byte replay against the ProtocolMap (or the undecoded seed).
+  cfg = {}
+  if args.config:
+    with open(args.config, encoding="utf-8") as fh:
+      cfg = json.load(fh)
+  pm = ProtocolMap.from_json(args.map) if args.map else seed("viaflo96")
+  if cfg.get("transport"):
+    pm.transport = Transport(cfg["transport"])
+  endpoint = args.endpoint or cfg.get("endpoint")
+  if endpoint:
+    pm.endpoint = endpoint
+  guards = Guards(armed=args.armed, allow_actuation=args.allow_actuation)
+  dev = IntegraViaflo96(pm=pm, guards=guards, max_volume_ul=args.max_volume)
+  dev.setup()
+  try:
+    if args.action == "status":
+      print(dev.get_status())
+    elif args.action == "identity":
+      print(dev.get_identity())
+    elif args.action == "programs":
+      print(dev.list_programs())
+    elif args.action == "upload":
+      if not args.program:
+        print("error: --program NAME is required for upload", file=sys.stderr)
+        return 2
+      dev.upload_program(args.program)
+      print("program uploaded" if guards.armed else "upload (dry-run)")
+    elif args.action == "run":
+      dev.run_program(args.program)  # selects first if --program is given
+      print("program running" if guards.armed else "run (dry-run)")
+    elif args.action == "home":
+      dev.home()
+      print("homed" if guards.armed else "home (dry-run)")
+    elif args.action == "abort":
+      dev.abort()
+      print("abort sent" if guards.armed else "abort (dry-run)")
+  finally:
+    dev.stop()
+  return 0
+
+
 # -- capture -----------------------------------------------------------------
 
 
@@ -415,6 +476,24 @@ def build_parser() -> argparse.ArgumentParser:
   arm_flags(nm)
   nm.set_defaults(func=_namocell)
 
+  vf = sub.add_parser("viaflo", help="Integra VIAFLO 96 USB discovery + guarded program control")
+  vf.add_argument(
+    "action", choices=["discover", "status", "identity", "programs", "upload", "run", "home", "abort"]
+  )
+  vf.add_argument("--map", help="decoded ProtocolMap JSON (default: undecoded seed)")
+  vf.add_argument("--config", help="transport/endpoint config JSON (transport/endpoint)")
+  vf.add_argument("--endpoint", help="control link, e.g. /dev/ttyUSB0@115200 (USB-serial)")
+  vf.add_argument("--program", help="program name to upload/select (upload, run)")
+  vf.add_argument(
+    "--max-volume",
+    type=float,
+    default=300.0,
+    dest="max_volume",
+    help="installed pipetting head's max volume in uL (set to your head)",
+  )
+  arm_flags(vf)
+  vf.set_defaults(func=_viaflo)
+
   cap = sub.add_parser("capture", help="capture OEM traffic while marking actions")
   capsub = cap.add_subparsers(dest="what", required=True)
   lan = capsub.add_parser("lan")
@@ -455,7 +534,7 @@ def build_parser() -> argparse.ArgumentParser:
   sd = mpsub.add_parser("seed")
   sd.add_argument(
     "instrument",
-    choices=["facsmelody", "agilent6530", "biotage_v10", "element_aviti", "namocell"],
+    choices=["facsmelody", "agilent6530", "biotage_v10", "element_aviti", "namocell", "viaflo96"],
   )
   sd.add_argument("--out", required=True)
   cv = mpsub.add_parser("coverage")
