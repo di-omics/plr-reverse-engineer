@@ -34,6 +34,56 @@ and the talk ["How To Reverse Engineer Lab Equipment"](https://www.youtube.com/w
 | Element AVITI | DNA sequencer (NGS) | [instruments/element-aviti](instruments/element-aviti/README.md) | Tier 0 run-folder telemetry works today; HTTP/JSON control API being recovered |
 | Namocell Hana | Single-cell dispenser | [instruments/namocell-hana](instruments/namocell-hana/README.md) | Tier 0 USB discovery works today; byte command set being recovered |
 
+## The whole lab
+
+Each playbook above brings one instrument under control. `plr-re lab` asks the question
+that only makes sense across all of them at once: given the instruments on the bench and
+the command sets decoded so far, how much of an end-to-end run happens without a human,
+and what exactly is in the way?
+
+```
+plr-re lab stock                          # every instrument, its role, how far its map is
+plr-re lab ledger single_cell_genomics    # cost a protocol step by step
+plr-re lab gaps                           # the RE queue, ranked by steps freed
+plr-re lab run single_cell_genomics       # run it as far as it honestly goes
+```
+
+The answer today is unflattering, which is the point. Costing the single-cell genomics
+reference protocol (Namocell sort -> STAR whole-genome preparation -> ODTC PCR1 -> STAR library -> AVITI
+sequencing -> run-folder readout) against this repo as it stands, with a plr-tested
+checkout wired in via `--plr-tested` (without it those legs cost out as manual too, and
+`reachable` drops from 29% to 18%):
+
+| | steps | |
+| --- | --- | --- |
+| automated | 3 of 17 | run headless today: two link preflights and the AVITI run-folder read |
+| supervised | 2 of 17 | a validated run card exists in [plr-tested](https://github.com/di-omics/plr-tested), gated on a confirm token and an operator |
+| blocked | 8 of 17 | the command is undecoded; the coverage gate refuses the run |
+| manual | 4 of 17 | seating a cartridge, loading a flow cell, and two STAR steps nobody has written a validated script for |
+
+**An unattended run reaches step 1 of 17 before it stops**, and there are 4 physical plate
+hops no amount of decoding removes. That number, not the 18% autonomy figure, is what
+"how automated is this lab" actually means: a read-only step near the end is only
+reachable if everything before it also ran.
+
+Note what the supervised row does *not* include. plr-tested has a validated whole-genome preparation
+addition and a validated pcr_enrichment choreography; it has no validated bead cleanup and no
+validated library pooling. So those two steps cost out as manual even though they name a
+validated instrument, because an instrument's record is not a claim about an arbitrary
+step on it. The whole-genome preparation leg that does count is dry-validated, and the ledger says so in
+the same breath: its wet form has never run.
+
+Nothing in the layer can flatter the lab. Verdicts are computed from the resolved
+ProtocolMap, so a step counts as automated only if its command is genuinely decoded --
+there is no field a protocol author can set to declare one. The reference protocols
+deliberately include the cartridge seating and flow-cell loading a demo would omit. And
+because the coverage gate is all-or-nothing across a map, `lab gaps` ranks by instrument
+rather than by command: decoding one command of an instrument frees no steps at all, so a
+per-command queue would be advice nobody could act on.
+
+The registry is derived from `plr_re.protocolmap.SEEDS` rather than restated beside it, so
+an instrument cannot drift out of the lab and a new playbook joins it automatically.
+
 [PREFLIGHT.md](PREFLIGHT.md) is the checkbox buy-and-pack checklist,
 [PI-SETUP.md](PI-SETUP.md) prepares the Raspberry Pi capture host,
 [bench-kit.md](bench-kit.md) is the bill of materials with rationale, [APPROACH.md](APPROACH.md)
@@ -112,6 +162,14 @@ plr-re map coverage maps/biotage_v10.json     # exits non-zero while anything is
 
 # Biotage setpoint, guarded, with a hard temperature ceiling. Dry-run until armed:
 plr-re biotage set-temp 40 --map maps/biotage_v10.json
+
+# The whole lab: what runs today across every instrument, and what blocks the rest.
+plr-re lab stock                             # inventory + per-instrument coverage
+plr-re lab protocols                         # the reference end-to-end flows
+plr-re lab ledger single_cell_genomics       # cost it step by step (non-zero while blocked)
+plr-re lab gaps                              # which map to decode next, ranked by steps freed
+plr-re lab run single_cell_genomics --armed  # perform the read-only steps, stop at the first human
+plr-re lab ledger single_cell_genomics --plr-tested ../plr-tested   # wire the validated STAR/ODTC legs
 ```
 
 Everything that can move hardware is dry-run until `--armed`, and actuating commands

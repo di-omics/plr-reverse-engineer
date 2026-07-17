@@ -356,6 +356,114 @@ def _map(args) -> int:
   return 2
 
 
+# -- lab ---------------------------------------------------------------------
+
+
+def _lab_workcell(args):
+  """Resolve the workcell: from --workcell if given, else the honest zero state."""
+  from .lab import Workcell
+
+  wc = Workcell.from_json(args.workcell) if args.workcell else Workcell.default()
+  if getattr(args, "plr_tested", None):
+    wc.plr_tested_root = args.plr_tested
+  return wc
+
+
+def _lab(args) -> int:
+  from .lab import build_ledger, protocols, rank_unlocks, registry
+  from .lab.registry import FEDERATED
+
+  wc = _lab_workcell(args)
+
+  if args.what == "stock":
+    print(f"workcell: {wc.name}\n")
+    print("reverse-engineered instruments (this repo):")
+    for key, s in sorted(registry().items()):
+      cov = wc.coverage(key)
+      zero = ", ".join(op.value for op in s.zero_decode) or "none"
+      here = "" if wc.instruments.get(key, None) and wc.instruments[key].present else "  [not in workcell]"
+      print(f"\n  {s.device}  ({key}){here}")
+      print(f"    role         {s.role.value}")
+      print(f"    transport    {s.transport.value} ({s.transport_note})")
+      print(f"    decoded      {cov['decoded']}/{cov['total']} commands")
+      print(f"    works today  {zero}")
+      if s.controller is None:
+        print("    controller   none in this repo")
+      if s.note:
+        print(f"    note         {s.note}")
+    print("\nfederated instruments (driven from di-omics/plr-tested):")
+    for key in sorted(FEDERATED):
+      f = FEDERATED[key]
+      wired = "wired" if (key in wc.federated and wc.plr_tested_root) else "not wired"
+      print(f"\n  {f.device}  ({key})  [{wired}]")
+      print(f"    role         {f.role.value}")
+      print(f"    entry        {f.entry}")
+      print(f"    validated    {f.validated}")
+      if f.note:
+        print(f"    note         {f.note}")
+    return 0
+
+  if args.what == "protocols":
+    for name, p in sorted(protocols.REFERENCE_PROTOCOLS.items()):
+      print(f"{name}  ({len(p.steps)} steps)")
+      print(f"  {p.summary}")
+    return 0
+
+  if args.what == "ledger":
+    p = protocols.get(args.protocol)
+    ledger = build_ledger(p, wc)
+    print(f"protocol: {p.name}\n{p.summary}\n")
+    for i, row in enumerate(ledger.rows, 1):
+      print(f"  {i:2d}. {row.verdict.value.upper():<10} {row.step.instrument:<14} {row.step.summary}")
+      print(f"      {row.reason}")
+    counts = ledger.counts()
+    print(
+      f"\n  automated {counts['automated']}  supervised {counts['supervised']}  "
+      f"blocked {counts['blocked']}  manual {counts['manual']}   (of {len(ledger.rows)})"
+    )
+    print(f"  autonomy         {100 * ledger.autonomy():.0f}%  (steps that run headless today)")
+    print(f"  reachable        {100 * ledger.reachable():.0f}%  (incl. steps a human supervises)")
+    print(
+      f"  unattended run   reaches step {ledger.headless_prefix()} of {len(ledger.rows)} "
+      "before it stops"
+    )
+    hops = ledger.handoffs()
+    if hops:
+      print(f"  physical hops    {len(hops)} (no decoding removes these; only a plate mover does)")
+      for art, src, dst in hops:
+        print(f"                   {art}: {src} -> {dst}")
+    stop = ledger.first_stop()
+    if stop is not None:
+      print(f"\n  first stop: {stop.step.summary}\n              {stop.reason}")
+    # Exit non-zero while the protocol cannot run unattended, matching `map coverage`,
+    # so this is usable as a gate rather than only as a report.
+    return 0 if ledger.headless_prefix() == len(ledger.rows) else 1
+
+  if args.what == "gaps":
+    names = [args.protocol] if args.protocol else sorted(protocols.REFERENCE_PROTOCOLS)
+    ranked = rank_unlocks([protocols.get(n) for n in names], wc)
+    print(f"reverse-engineering queue across: {', '.join(names)}\n")
+    if not ranked:
+      print("  nothing blocked.")
+      return 0
+    print("  Ranked by steps freed. The coverage gate is all-or-nothing, so the unit here")
+    print("  is a finished map: decoding one command of an instrument frees nothing.\n")
+    for u in ranked:
+      print(f"  {u.instrument:<14} frees {u.steps_unblocked} step(s), needs {u.cost} command(s) decoded")
+      print(f"                 {', '.join(u.commands_to_decode)}")
+    return 1
+
+  if args.what == "run":
+    from .lab import Executor
+
+    p = protocols.get(args.protocol)
+    report = Executor(wc, armed=args.armed).run(p)
+    print(report.render())
+    return 0 if report.handoff is None else 1
+
+  return 2
+
+
 def build_parser() -> argparse.ArgumentParser:
   p = argparse.ArgumentParser(prog="plr-re", description=__doc__)
   sub = p.add_subparsers(dest="cmd", required=True)
@@ -449,6 +557,37 @@ def build_parser() -> argparse.ArgumentParser:
   hr = decsub.add_parser("har")
   hr.add_argument("path", help="HAR from `capture http` or a browser devtools export")
   dec.set_defaults(func=_decode)
+
+  lb = sub.add_parser("lab", help="the whole lab: what runs today, and what blocks the rest")
+  lbsub = lb.add_subparsers(dest="what", required=True)
+
+  def lab_common(sp):
+    sp.add_argument("--workcell", help="workcell JSON (default: every instrument, nothing decoded)")
+    sp.add_argument(
+      "--plr-tested",
+      dest="plr_tested",
+      help="path to a di-omics/plr-tested checkout, to wire the validated STAR/ODTC legs",
+    )
+
+  lb_stock = lbsub.add_parser("stock", help="every instrument, its role, and how far its map is")
+  lab_common(lb_stock)
+  lb_protos = lbsub.add_parser("protocols", help="list the reference protocols")
+  lab_common(lb_protos)
+  lb_ledger = lbsub.add_parser(
+    "ledger", help="cost a protocol: what runs headless, what a human does, what is blocked"
+  )
+  lb_ledger.add_argument("protocol")
+  lab_common(lb_ledger)
+  lb_gaps = lbsub.add_parser("gaps", help="the reverse-engineering queue, ranked by steps freed")
+  lb_gaps.add_argument("protocol", nargs="?", help="default: all reference protocols")
+  lab_common(lb_gaps)
+  lb_run = lbsub.add_parser("run", help="run a protocol as far as it honestly goes")
+  lb_run.add_argument("protocol")
+  lb_run.add_argument(
+    "--armed", action="store_true", help="perform the read-only steps for real (never actuates)"
+  )
+  lab_common(lb_run)
+  lb.set_defaults(func=_lab)
 
   mp = sub.add_parser("map", help="seed, inspect, and check ProtocolMap coverage")
   mpsub = mp.add_subparsers(dest="what", required=True)
