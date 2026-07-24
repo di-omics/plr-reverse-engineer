@@ -49,7 +49,7 @@ plr-re lab run single_cell_genomics       # run it as far as it honestly goes
 ```
 
 The answer today is unflattering, which is the point. Costing the single-cell genomics
-reference protocol (Namocell sort -> STAR whole-genome preparation -> ODTC PCR1 -> STAR library -> AVITI
+reference protocol (Namocell sort -> STAR WGS preparation -> ODTC PCR enrichment -> STAR library -> AVITI
 sequencing -> run-folder readout) against this repo as it stands, with a plr-tested
 checkout wired in via `--plr-tested` (without it those legs cost out as manual too, and
 `reachable` drops from 29% to 18%):
@@ -66,11 +66,11 @@ hops no amount of decoding removes. That number, not the 18% autonomy figure, is
 "how automated is this lab" actually means: a read-only step near the end is only
 reachable if everything before it also ran.
 
-Note what the supervised row does *not* include. plr-tested has a validated whole-genome preparation
-addition and a validated pcr_enrichment choreography; it has no validated bead cleanup and no
+Note what the supervised row does *not* include. plr-tested has a validated WGS preparation
+addition and a validated PCR enrichment choreography; it has no validated bead cleanup and no
 validated library pooling. So those two steps cost out as manual even though they name a
 validated instrument, because an instrument's record is not a claim about an arbitrary
-step on it. The whole-genome preparation leg that does count is dry-validated, and the ledger says so in
+step on it. The WGS preparation leg that does count is dry-validated, and the ledger says so in
 the same breath: its wet form has never run.
 
 Nothing in the layer can flatter the lab. Verdicts are computed from the resolved

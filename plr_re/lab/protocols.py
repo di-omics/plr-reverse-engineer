@@ -27,8 +27,8 @@ ARTIFACTS: Dict[str, Artifact] = {
   "cell_suspension": Artifact("cell_suspension", physical=True, note="bulk population, loaded by hand"),
   "sorted_plate": Artifact("sorted_plate", physical=True, note="96-well, one cell per well"),
   "lysate_plate": Artifact("lysate_plate", physical=True, note="lysed, ready for amplification"),
-  "amplified_plate": Artifact("amplified_plate", physical=True, note="post whole-genome preparation"),
-  "pcr1_plate": Artifact("pcr1_plate", physical=True, note="post pcr_enrichment PCR1"),
+  "amplified_plate": Artifact("amplified_plate", physical=True, note="post WGS preparation"),
+  "enriched_plate": Artifact("enriched_plate", physical=True, note="post PCR enrichment"),
   "library_plate": Artifact("library_plate", physical=True, note="indexed, poolable"),
   "flow_cell": Artifact("flow_cell", physical=True, note="loaded by hand with reagents"),
   "run_folder": Artifact("run_folder", note="AvitiOS output folder; data, not material"),
@@ -48,7 +48,7 @@ ARTIFACTS: Dict[str, Artifact] = {
 SINGLE_CELL_GENOMICS = Protocol(
   name="single_cell_genomics",
   summary=(
-    "Single cells to sequencing outcome: Namocell sort, STAR whole-genome preparation, ODTC pcr_enrichment PCR1, "
+    "Single cells to sequencing outcome: Namocell sort, STAR WGS preparation, ODTC PCR enrichment, "
     "STAR library prep, AVITI sequencing, run-folder readout."
   ),
   artifacts=tuple(ARTIFACTS.values()),
@@ -87,8 +87,8 @@ SINGLE_CELL_GENOMICS = Protocol(
     Step(instrument="namocell", op="wait_complete", summary="poll until the plate is fully sorted"),
     Step(
       instrument="star",
-      op="pta_wga_lysis",
-      summary="lyse and add whole-genome preparation reaction mix (validated dry on hardware)",
+      op="wgs_preparation",
+      summary="lyse and add WGS preparation reaction mix (validated dry on hardware)",
       consumes=("sorted_plate",),
       produces=("lysate_plate",),
     ),
@@ -101,16 +101,16 @@ SINGLE_CELL_GENOMICS = Protocol(
     ),
     Step(
       instrument="star",
-      op="pcr_enrichment_round1_cleanup",
+      op="pcr_enrichment_cleanup",
       summary="magnetic bead cleanup and index addition",
       consumes=("amplified_plate",),
-      produces=("pcr1_plate",),
+      produces=("enriched_plate",),
     ),
     Step(
       instrument="star",
       op="library_pool",
       summary="normalize and pool the indexed library",
-      consumes=("pcr1_plate",),
+      consumes=("enriched_plate",),
       produces=("library_plate",),
     ),
     Step(

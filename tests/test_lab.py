@@ -188,7 +188,7 @@ def test_absent_instrument_is_manual():
 
 def test_federated_step_needs_the_seam_wired():
   wc = Workcell.default()  # plr_tested_root is None
-  v = cost_step(Step(instrument="star", op="pta_wga_lysis", summary="x"), wc)
+  v = cost_step(Step(instrument="star", op="wgs_preparation", summary="x"), wc)
   assert v.verdict is Verdict.MANUAL
   assert "plr_tested_root" in v.reason
 
@@ -197,7 +197,7 @@ def test_federated_step_is_supervised_never_automated():
   """Hardware that a human stands next to is not headless, however validated it is."""
   wc = Workcell.default()
   wc.plr_tested_root = "/somewhere/plr-tested"
-  v = cost_step(Step(instrument="star", op="pta_wga_lysis", summary="x"), wc)
+  v = cost_step(Step(instrument="star", op="wgs_preparation", summary="x"), wc)
   assert v.verdict is Verdict.SUPERVISED
   assert v.verdict.headless is False
 
@@ -214,10 +214,10 @@ def test_federated_step_without_a_validated_run_card_is_manual():
 
 def test_supervised_reason_carries_the_actual_validation_record():
   """A supervised verdict must say what was actually watched, including the caveats: the
-  whole-genome preparation leg is dry-validated and its wet form has never run."""
+  WGS preparation leg is dry-validated and its wet form has never run."""
   wc = Workcell.default()
   wc.plr_tested_root = "/somewhere/plr-tested"
-  v = cost_step(Step(instrument="star", op="pta_wga_lysis", summary="x"), wc)
+  v = cost_step(Step(instrument="star", op="wgs_preparation", summary="x"), wc)
   assert "DRY" in v.reason and "never run" in v.reason
 
 

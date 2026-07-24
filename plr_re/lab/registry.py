@@ -60,7 +60,7 @@ class FederatedSpec:
   operation to what an operator has ACTUALLY watched that operation do on the instrument.
   An operation absent from it costs out as manual, however capable the instrument is. The
   distinction matters because "the STAR is validated" is not a claim about any particular
-  step: plr-tested has a validated whole-genome preparation addition and a validated pcr_enrichment choreography,
+  step: plr-tested has a validated WGS preparation addition and a validated PCR enrichment choreography,
   and no validated bead cleanup or library pooling at all. Letting a step inherit the
   instrument's reputation is exactly the overclaim this layer exists to prevent.
   """
@@ -191,12 +191,12 @@ FEDERATED: Dict[str, FederatedSpec] = {
     plan_flag="--plan",
     confirm_token="RUN_PCR_ENRICHMENT_ODTC_LIDDED_FULL",
     validated=(
-      "Safe init, whole-genome preparation single-column and full-plate dry, iSWAP lid moves, and the "
-      "lidded pcr_enrichment choreography: 13 motion legs, 22 SUCCESS, 0 failures, deck "
+      "Safe init, WGS preparation single-column and full-plate dry, iSWAP lid moves, and the "
+      "lidded PCR enrichment choreography: 13 motion legs, 22 SUCCESS, 0 failures, deck "
       "self-returned to start."
     ),
     validated_ops={
-      "pta_wga_lysis": (
+      "wgs_preparation": (
         "single-column and full-plate DRY, lysis 3.0 uL and reaction 6.0 uL; the wet "
         "single addition is written but has never run"
       ),
@@ -216,7 +216,7 @@ FEDERATED: Dict[str, FederatedSpec] = {
     plan_flag=None,
     confirm_token=None,
     validated=(
-      "Bring-up, hold to 45.00 C, cycling to 50.00 C, and pcr-enrichment-round1: 30 real cycles, "
+      "Bring-up, hold to 45.00 C, cycling to 50.00 C, and PCR-enrichment round 1: 30 real cycles, "
       "36.6 min, mean 0.27 C setpoint error."
     ),
     validated_ops={
@@ -228,7 +228,7 @@ FEDERATED: Dict[str, FederatedSpec] = {
     },
     note=(
       "The choreography never closes the ODTC door around the thermal leg, which is not "
-      "a thermally sound way to run a real PCR. pcr-enrichment-round2 has never run."
+      "a thermally sound way to run a real PCR. PCR-enrichment round 2 has never run."
     ),
   ),
   "hhs": FederatedSpec(
