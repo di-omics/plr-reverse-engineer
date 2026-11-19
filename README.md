@@ -162,3 +162,7 @@ timid by default:
 Reverse-engineering an instrument you own for interoperability is a legitimate,
 well-established practice. The guards and the vendor interlocks stay in place: this
 tooling orchestrates, it does not remove an instrument's own limits.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
