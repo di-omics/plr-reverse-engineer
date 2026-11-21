@@ -63,6 +63,9 @@ sample. Keep the guards.
 ## Current status
 
 The command set for the FACSMelody is being recovered with the plr-re toolkit. The
-backend in PyLabRobot is complete and tested in dry-run and chatterbox modes; it has not
-yet been run against an instrument. Hardware validation (step 6) is in progress and will
-be reported honestly when it lands.
+backend is complete on a
+[PyLabRobot fork branch](https://github.com/di-omics/pylabrobot/tree/facsmelody-sorter)
+and tested in dry-run and chatterbox modes; it has not yet been run against an instrument.
+It is not in upstream PyLabRobot: the pull request was closed without merging in August
+2026. Hardware validation (step 6) is in progress and will be reported honestly when it
+lands.

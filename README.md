@@ -28,7 +28,7 @@ and the talk ["How To Reverse Engineer Lab Equipment"](https://www.youtube.com/w
 
 | Instrument | What it is | Playbook | Status |
 | --- | --- | --- | --- |
-| BD FACSMelody | Cell sorter (FACS) | [instruments/bd-facsmelody](instruments/bd-facsmelody/README.md) | Backend in PyLabRobot (dry-run tested); command set being recovered |
+| BD FACSMelody | Cell sorter (FACS) | [instruments/bd-facsmelody](instruments/bd-facsmelody/README.md) | Backend on [a PyLabRobot fork branch](https://github.com/di-omics/pylabrobot/tree/facsmelody-sorter) (dry-run tested), not in upstream PyLabRobot; command set being recovered |
 | Agilent 6530 Q-TOF | Accurate-mass LC/MS | [instruments/agilent-6530-qtof](instruments/agilent-6530-qtof/README.md) | Priority; Tier 0 contact closure needs no decoding, LAN control map in progress |
 | Biotage V-10 Touch | Solvent evaporator | [instruments/biotage-v10-touch](instruments/biotage-v10-touch/README.md) | Transport branch resolved on the bench, then ProtocolMap recovery |
 | Element AVITI | DNA sequencer (NGS) | [instruments/element-aviti](instruments/element-aviti/README.md) | Tier 0 run-folder telemetry works today; HTTP/JSON control API being recovered |
