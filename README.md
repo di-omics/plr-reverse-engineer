@@ -29,8 +29,8 @@ and the talk ["How To Reverse Engineer Lab Equipment"](https://www.youtube.com/w
 | Instrument | What it is | Playbook | Status |
 | --- | --- | --- | --- |
 | BD FACSMelody | Cell sorter (FACS) | [instruments/bd-facsmelody](instruments/bd-facsmelody/README.md) | Backend on [a PyLabRobot fork branch](https://github.com/di-omics/pylabrobot/tree/facsmelody-sorter) (dry-run tested), not in upstream PyLabRobot; command set being recovered |
-| Agilent 6530 Q-TOF | Accurate-mass LC/MS | [instruments/agilent-6530-qtof](instruments/agilent-6530-qtof/README.md) | Priority; Tier 0 contact closure needs no decoding, LAN control map in progress |
-| Biotage V-10 Touch | Solvent evaporator | [instruments/biotage-v10-touch](instruments/biotage-v10-touch/README.md) | Transport confirmed from Biotage's installation document; ProtocolMap recovery next |
+| Agilent 6530 Q-TOF | Accurate-mass LC/MS | [instruments/agilent-6530-qtof](instruments/agilent-6530-qtof/README.md) | Tier 0 contact closure needs no decoding; LAN control map in progress |
+| Biotage V-10 Touch | Solvent evaporator | [instruments/biotage-v10-touch](instruments/biotage-v10-touch/README.md) | Transport confirmed in Biotage's installation document; ProtocolMap recovery next |
 | Element AVITI | DNA sequencer (NGS) | [instruments/element-aviti](instruments/element-aviti/README.md) | Tier 0 run-folder telemetry works today; HTTP/JSON control API being recovered |
 | Namocell Hana | Single-cell dispenser | [instruments/namocell-hana](instruments/namocell-hana/README.md) | Tier 0 USB discovery works today; byte command set being recovered |
 

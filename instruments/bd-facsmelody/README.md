@@ -58,7 +58,7 @@ sample. Keep the guards.
 6. **Validate on the instrument.** Only after the map is complete and replay is
    confirmed on read-only commands, run a real sort-to-plate with a human present. This
    is the step that moves the backend from not-yet-hardware-validated to
-   hardware-validated, and it is follow-up to opening the PR, not a prerequisite.
+   hardware-validated.
 
 ## Current status
 
@@ -67,5 +67,4 @@ backend is complete on a
 [PyLabRobot fork branch](https://github.com/di-omics/pylabrobot/tree/facsmelody-sorter)
 and tested in dry-run and chatterbox modes; it has not yet been run against an instrument.
 It is not in upstream PyLabRobot: the pull request was closed without merging in August
-2026. Hardware validation (step 6) is in progress and will be reported honestly when it
-lands.
+2026. Hardware validation (step 6) will be reported honestly when it lands.

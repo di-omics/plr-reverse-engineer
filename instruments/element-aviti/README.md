@@ -198,8 +198,8 @@ inventing one, adapted from a USB/serial wire to an HTTP/JSON one:
 ## Current status
 
 Tier 0 (run-folder state) is implemented and safe to use today; it needs no decoding and
-only reads the output folder. Tier 1 discovery is a read-only probe. The control API
-(Tier 2/3) is recovered with the plr-re toolkit on the bench: the seed map lists the
+only reads the output folder. Tier 1 discovery is a read-only probe. The control API (Tier
+2/3) is being recovered with the plr-re toolkit on the bench: the seed map lists the
 required commands, the HAR decoder reads them out of a capture, and the guarded HTTP
-replayer refuses a live run against an incomplete map. Hardware validation (step 6) will
+replayer refuses a live run against an incomplete map. Hardware validation (step 7) will
 be reported honestly when it lands.

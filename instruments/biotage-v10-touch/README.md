@@ -154,10 +154,9 @@ configured ceiling before it is ever framed.
 
 ## Current status
 
-The primary transport is the documented Control Centre link (Ethernet/TCP-IP, confirmed);
-sniffing it, rather than a teardown, is the expected path, with the internal HMI bus as
-fallback.
-The ProtocolMap is then recovered with the plr-re toolkit; a Modbus RTU link would make
-the register map quick. The plr-re controller is dry-run by default, enforces a temperature
-ceiling, and refuses a live run against an incomplete map. Hardware validation (step 6)
-will be reported honestly when it lands.
+The primary transport is the documented Control Centre link (Ethernet/TCP-IP, confirmed in
+Biotage's installation document); sniffing it, rather than a teardown, is the expected
+path, with the internal HMI bus as fallback. The ProtocolMap is then recovered with the
+plr-re toolkit; a Modbus RTU link would make the register map quick. The plr-re controller
+is dry-run by default, enforces a temperature ceiling, and refuses a live run against an
+incomplete map. Hardware validation (step 6) will be reported honestly when it lands.

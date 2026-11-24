@@ -190,8 +190,8 @@ inventing one:
 ## Current status
 
 Tier 0 (read-only USB/serial discovery) is implemented and safe to use today; it needs no
-decoding and only enumerates the attached devices. The command set (Tier 2/3) is recovered
-with the plr-re toolkit on the bench: the seed map lists the required commands, the
-byte-diff decoder reads each field out of a capture, and the guarded replayer refuses a
-live run against an incomplete map and rejects an unsupported plate format. Hardware
+decoding and only enumerates the attached devices. The command set (Tier 2/3) is being
+recovered with the plr-re toolkit on the bench: the seed map lists the required commands,
+the byte-diff decoder reads each field out of a capture, and the guarded replayer refuses
+a live run against an incomplete map and rejects an unsupported plate format. Hardware
 validation (step 7) will be reported honestly when it lands.
