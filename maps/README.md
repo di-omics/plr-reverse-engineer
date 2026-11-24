@@ -1,8 +1,7 @@
 # maps
 
 Decoded `ProtocolMap` JSON files land here, one per instrument, produced during the
-bench session and consumed by the guarded replayer (and by the PyLabRobot backends in
-di-omics/pylabrobot).
+bench session and consumed by the guarded replayer (and by the FACSMelody PyLabRobot backend on a di-omics/pylabrobot fork branch).
 
 Start one from a seed and fill it in as you decode:
 

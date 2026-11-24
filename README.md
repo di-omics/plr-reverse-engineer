@@ -8,12 +8,12 @@ published automation API under PyLabRobot control, so a run can drive them headl
 > bench). The repository is named `plr-reverse-engineer` so its purpose is obvious at a
 > glance; they are the same project.
 
-This repo is the reverse-engineering side. The PyLabRobot backends that actually talk to
-the hardware live in [di-omics/pylabrobot](https://github.com/di-omics/pylabrobot). The
+This repo is the reverse-engineering side. The one PyLabRobot backend written so far (BD FACSMelody) lives on
+[a branch of the di-omics/pylabrobot fork](https://github.com/di-omics/pylabrobot/tree/facsmelody-sorter), not in upstream PyLabRobot; the other 4 instruments run through the guarded controllers in `plr_re/instruments/`. The
 split is deliberate: the work here recovers a vendor command set and captures it as a
 `ProtocolMap` (a decoded, replayable set of commands); the backend there loads a finished
 ProtocolMap and replays it behind hard safety guards. Capture, correlation, and decoding
-stay out of the PyLabRobot tree; only the read side ships in the library.
+stay out of the PyLabRobot tree; only the replay side would ship in the library.
 
 The method follows PyLabRobot's own reverse-engineering approach (Rick Wierenga and the
 PLR maintainers), credited and adapted per instrument. The core principle, from the PLR
@@ -30,9 +30,11 @@ and the talk ["How To Reverse Engineer Lab Equipment"](https://www.youtube.com/w
 | --- | --- | --- | --- |
 | BD FACSMelody | Cell sorter (FACS) | [instruments/bd-facsmelody](instruments/bd-facsmelody/README.md) | Backend on [a PyLabRobot fork branch](https://github.com/di-omics/pylabrobot/tree/facsmelody-sorter) (dry-run tested), not in upstream PyLabRobot; command set being recovered |
 | Agilent 6530 Q-TOF | Accurate-mass LC/MS | [instruments/agilent-6530-qtof](instruments/agilent-6530-qtof/README.md) | Priority; Tier 0 contact closure needs no decoding, LAN control map in progress |
-| Biotage V-10 Touch | Solvent evaporator | [instruments/biotage-v10-touch](instruments/biotage-v10-touch/README.md) | Transport branch resolved on the bench, then ProtocolMap recovery |
+| Biotage V-10 Touch | Solvent evaporator | [instruments/biotage-v10-touch](instruments/biotage-v10-touch/README.md) | Transport confirmed from Biotage's installation document; ProtocolMap recovery next |
 | Element AVITI | DNA sequencer (NGS) | [instruments/element-aviti](instruments/element-aviti/README.md) | Tier 0 run-folder telemetry works today; HTTP/JSON control API being recovered |
 | Namocell Hana | Single-cell dispenser | [instruments/namocell-hana](instruments/namocell-hana/README.md) | Tier 0 USB discovery works today; byte command set being recovered |
+
+Hardware validation is still pending for every instrument: the tests here are device-free (mock transports, no instrument attached), and each playbook will report bench results when they land.
 
 [PREFLIGHT.md](PREFLIGHT.md) is the checkbox buy-and-pack checklist,
 [PI-SETUP.md](PI-SETUP.md) prepares the Raspberry Pi capture host,
@@ -49,7 +51,7 @@ capture the Namocell host-to-instrument byte traffic.
 
 Partly, and the honest split matters:
 
-- **Mass spec Tier 0 (contact closure): yes, plug in and go.** It needs no decoding.
+- **Mass spec Tier 0 (contact closure): no decoding needed, but the pin map is bench work.**
   Wire the Pi to the rear remote lines, identify which pin is Ready/Start/Stop with a
   meter and logic analyzer, fill in a pin map, and run armed. `plr_re.instruments.agilent6530`
   reads Ready and pulses Start/Stop behind the guards.
@@ -61,7 +63,7 @@ Partly, and the honest split matters:
   protocol instrument with no plug-in-and-go control path, but `plr-re namocell discover`
   enumerates the USB/serial link read-only, with no decoding, to find the wire before
   capture. Driving the dispenser is a bench capture-and-decode job like the FACSMelody.
-- **Decoded protocol control (LAN for the Q-TOF, the HMI bus for the V-10, the AvitiOS
+- **Decoded protocol control (LAN for the Q-TOF, the Control Centre Ethernet link or HMI bus for the V-10, the AvitiOS
   HTTP API for the AVITI, the byte link for the Hana): not before the bench.** By
   definition: the commands are unknown
   until you capture them from the instrument, so no one can pre-bake a working `start_run`
@@ -69,7 +71,7 @@ Partly, and the honest split matters:
   capture with action marking, a byte-diff correlator, a Modbus decoder, a HAR decoder,
   and a guarded replayer that runs a map the moment it is complete.
 
-In short: the contact-closure MVP is go; the rest is a fast, guarded capture-and-decode
+In short: the contact-closure path needs only a pin map from the bench; the rest is a fast, guarded capture-and-decode
 loop rather than a manual one.
 
 ## Quickstart (the toolkit)

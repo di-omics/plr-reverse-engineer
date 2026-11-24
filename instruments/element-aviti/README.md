@@ -10,15 +10,14 @@ the reverse-engineering methodology Rick Wierenga used to bring other instrument
 PyLabRobot, adapted here for a modern HTTP/JSON microservice instrument.
 
 The recovered command set is captured as a `ProtocolMap` (a decoded, replayable set of
-commands), the same artifact the other backends consume. The reverse-engineering that
-produces a ProtocolMap lives here in plr-re; the PyLabRobot backend (in
-[di-omics/pylabrobot](https://github.com/di-omics/pylabrobot)) only loads a finished
-ProtocolMap and replays it behind hard guards.
+commands), the same artifact the FACSMelody backend consumes. The reverse-engineering that
+produces a ProtocolMap lives here in plr-re; a PyLabRobot backend (not yet written; see "PyLabRobot integration shape" below) would only load a finished
+ProtocolMap and replay it behind hard guards.
 
 ## What is different about this one
 
-The three other instruments in this repo speak byte frames over a wire: contact-closure
-lines, a raw LAN socket, a Modbus serial bus. The AVITI is a networked microservice
+The other instruments in this repo speak byte frames over a wire, such as contact-closure
+lines, a raw LAN socket, or a Modbus serial bus. The AVITI is a networked microservice
 stack, so the transport class is HTTP/JSON, and the reverse-engineering is different in
 kind: capture the UI-to-service traffic as a HAR, read the API calls out of it, and
 record each one as a request template (method, path, JSON body) rather than a hex frame.

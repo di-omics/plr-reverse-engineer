@@ -12,10 +12,9 @@ reverse-engineering methodology Rick Wierenga used to bring other instruments in
 PyLabRobot, adapted here for a single-cell dispenser.
 
 The recovered command set is captured as a `ProtocolMap` (a decoded, replayable set of
-commands), the same artifact the other backends consume. The reverse-engineering that
-produces a ProtocolMap lives here in plr-re; the PyLabRobot backend (in
-[di-omics/pylabrobot](https://github.com/di-omics/pylabrobot)) only loads a finished
-ProtocolMap and replays it behind hard guards.
+commands), the same artifact the FACSMelody backend consumes. The reverse-engineering that
+produces a ProtocolMap lives here in plr-re; a PyLabRobot backend (not yet written; see "PyLabRobot integration shape" below) would only load a finished
+ProtocolMap and replay it behind hard guards.
 
 ## What kind of instrument this is (and what that means for RE)
 

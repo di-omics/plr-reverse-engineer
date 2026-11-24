@@ -11,9 +11,8 @@ PyLabRobot, credited here and adapted for an evaporator.
 
 The recovered command set is captured as a `ProtocolMap` (a decoded, replayable set of
 commands), the same artifact the FACSMelody backend consumes. The reverse-engineering
-that produces a ProtocolMap lives here in plr-re; the PyLabRobot backend (in
-[di-omics/pylabrobot](https://github.com/di-omics/pylabrobot)) only loads a finished
-ProtocolMap and replays it behind hard guards.
+that produces a ProtocolMap lives here in plr-re; a PyLabRobot backend (not yet written; see "PyLabRobot integration shape" below) would only load a finished
+ProtocolMap and replay it behind hard guards.
 
 ## The V-10 has a documented external interface (use it first)
 
@@ -159,6 +158,6 @@ The primary transport is the documented Control Centre link (Ethernet/TCP-IP, co
 sniffing it, rather than a teardown, is the expected path, with the internal HMI bus as
 fallback.
 The ProtocolMap is then recovered with the plr-re toolkit; a Modbus RTU link would make
-the register map quick. The PLR backend is dry-run by default, enforces a temperature
+the register map quick. The plr-re controller is dry-run by default, enforces a temperature
 ceiling, and refuses a live run against an incomplete map. Hardware validation (step 6)
 will be reported honestly when it lands.

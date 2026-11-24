@@ -67,21 +67,21 @@ git clone https://github.com/di-omics/plr-reverse-engineer.git
 cd plr-reverse-engineer
 python3 -m venv ~/plr-venv
 source ~/plr-venv/bin/activate
-pip install -e .
+pip install -e '.[dev]'
 ```
 
 ## 5. Verify it works (still at home)
 
 ```
 plr-re --help                                        # CLI is alive
-python3 -m pytest -q                                  # should say 18 passed
+python3 -m pytest -q                                  # should say 42 passed
 plr-re capture lan --iface eth0 --out /tmp/test.pcap --seconds 5
 ls -l /tmp/test.pcap                                  # non-zero size = capture works
 ```
 
 If those three pass, the Pi is genuinely ready.
 
-## 6. Two network roles (for on-site capture)
+## 6. Two network roles (for capture at the bench)
 
 You want the Pi to capture on the switch mirror port while you can still reach it to type
 commands. Two easy options:
@@ -93,7 +93,7 @@ Check interfaces with `ip link` (you will see eth0, wlan0, and eth1 if the USB a
 plugged in). The capture NIC does not need an IP; it just listens. Point the tool at it:
 `plr-re capture lan --iface eth1 ...`.
 
-## 7. On-site
+## 7. At the bench
 
 1. Bring the prepped Pi, its power supply (or a USB-C power bank), Ethernet cables, the
    USB-Ethernet adapter, and the managed switch.

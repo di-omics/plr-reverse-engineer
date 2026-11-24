@@ -10,9 +10,8 @@ other instruments into PyLabRobot, credited here and adapted for an LC/MS stack.
 
 The recovered command set is captured as a `ProtocolMap` (a decoded, replayable set
 of commands), the same artifact the FACSMelody backend consumes. The reverse-engineering
-that produces a ProtocolMap lives here in plr-re; the PyLabRobot backend (in
-[di-omics/pylabrobot](https://github.com/di-omics/pylabrobot)) only loads a finished
-ProtocolMap and replays it behind hard guards.
+that produces a ProtocolMap lives here in plr-re; a PyLabRobot backend (not yet written; see "PyLabRobot integration shape" below) would only load a finished
+ProtocolMap and replay it behind hard guards.
 
 ## Safety posture (read first)
 
@@ -162,5 +161,5 @@ acquisition. Contact-closure lines are represented in the ProtocolMap as a line 
 
 Transport discovery and the LC ProtocolMap are being recovered with the plr-re toolkit.
 Tier 0 (contact closure) is reversible and needs no decoding; the LAN control map is
-in progress. The PLR backend is dry-run by default and refuses a live run against an
+in progress. The plr-re guarded replayer is dry-run by default and refuses a live run against an
 incomplete map. Hardware validation (step 6) will be reported honestly when it lands.
